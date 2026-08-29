@@ -66,20 +66,22 @@ function Landing() {
   const [userLoggedIn, setUserLoggedIn] = useState(false);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
     // Catch access_token in hash fragment from Supabase auth redirects and forward to dashboard
-    if (typeof window !== "undefined" && window.location.hash.includes("access_token")) {
+    if (window.location.hash && window.location.hash.includes("access_token")) {
       supabase.auth.getSession().then(({ data }) => {
-        if (data.session) {
+        if (data?.session) {
           nav({ to: "/dashboard" });
         }
-      });
+      }).catch(() => {});
     }
 
     supabase.auth.getUser().then(({ data }) => {
-      if (data.user) {
+      if (data?.user) {
         setUserLoggedIn(true);
       }
-    });
+    }).catch(() => {});
   }, [nav]);
 
   return (

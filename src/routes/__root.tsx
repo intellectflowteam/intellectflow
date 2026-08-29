@@ -43,27 +43,38 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   }, [error]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">
+    <div className="flex min-h-screen items-center justify-center bg-[#fdf6ef] px-4">
+      <div className="max-w-md text-center space-y-4">
+        <h1 className="text-xl font-bold tracking-tight text-zinc-900">
           This page didn't load
         </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <p className="text-xs text-zinc-600">
           Something went wrong on our end. You can try refreshing or head back home.
         </p>
-        <div className="mt-6 flex flex-wrap justify-center gap-2">
+
+        {error?.message && (
+          <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-left overflow-x-auto">
+            <p className="font-mono text-[11px] text-red-700 font-bold">Error Details:</p>
+            <p className="font-mono text-[11px] text-red-600 mt-1 break-words">{error.message}</p>
+          </div>
+        )}
+
+        <div className="pt-2 flex flex-wrap justify-center gap-2">
           <button
             onClick={() => {
-              router.invalidate();
-              reset();
+              if (typeof window !== "undefined") window.location.reload();
+              else {
+                router.invalidate();
+                reset();
+              }
             }}
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            className="inline-flex items-center justify-center rounded-xl bg-black px-5 py-2.5 text-xs font-bold text-white transition-colors hover:bg-zinc-800 cursor-pointer shadow-xs"
           >
             Try again
           </button>
           <a
             href="/"
-            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+            className="inline-flex items-center justify-center rounded-xl border border-black/15 bg-white px-5 py-2.5 text-xs font-bold text-zinc-800 transition-colors hover:bg-zinc-50 cursor-pointer shadow-2xs"
           >
             Go home
           </a>
