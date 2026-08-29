@@ -72,16 +72,24 @@ type Step = "rate" | "negative" | "positive" | "redirect" | "done";
 
 type Suggestion = { text: string; keywords: string[] };
 
-function buildTemplates(name: string, type: string, city: string): Suggestion[] {
+function buildTemplates(name: string, type: string, city: string, keywords: string[] = []): Suggestion[] {
   const t = type || "business";
   const c = city || "town";
-  return [
-    { text: `Best ${t} in ${c}. Friendly staff and excellent service at ${name}.`, keywords: [t, c] },
-    { text: `Great quality and fair prices at ${name} — my go-to ${t} in ${c}.`, keywords: [t, c] },
-    { text: `Quick, clean and very professional. ${name} is a top ${t} in ${c}.`, keywords: [t, c] },
-    { text: `${name} નો અનુભવ સરસ રહ્યો. ${c} નું શ્રેષ્ઠ ${t}.`, keywords: [t, c] },
-    { text: `${name} में सर्विस शानदार है — ${c} का बेहतरीन ${t}.`, keywords: [t, c] },
+  const k1 = keywords[0] || `best ${t}`;
+  const k2 = keywords[1] || `top service in ${c}`;
+  const k3 = keywords[2] || `quality ${t}`;
+
+  const pool = [
+    { text: `Extremely satisfied with ${name}! Really fast ${k1} and courteous staff. Best ${t} experience in ${c}.`, keywords: [k1, t] },
+    { text: `Visited ${name} today. Amazing quality, super clean environment, and top-tier ${k2}. Highly recommended!`, keywords: [k2, "clean"] },
+    { text: `One of the finest places in ${c}! ${name} provides genuine ${k3} at very fair pricing.`, keywords: [k3, c] },
+    { text: `Had a wonderful experience at ${name}. The ${k1} was outstanding and service was prompt.`, keywords: [k1, "service"] },
+    { text: `Five stars for ${name}! Great customer support, authentic ${k3}, and overall 10/10 quality in ${c}.`, keywords: [k3, "quality"] },
+    { text: `${name} માં ${k1} ખૂબ ગમ્યું. ${c} નું નંબર 1 ${t}. 5 સ્ટાર અનુભવ!`, keywords: [k1, t] },
+    { text: `${name} में सर्विस शानदार है — ${c} का बेहतरीन ${k2}. Highly recommended!`, keywords: [k2, "service"] },
   ];
+
+  return [...pool].sort(() => 0.5 - Math.random()).slice(0, 5);
 }
 
 function PublicReview() {
@@ -98,9 +106,16 @@ function PublicReview() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiItems, setAiItems] = useState<Suggestion[] | null>(null);
 
+  const parsedKeywords = useMemo(() => {
+    const kwRaw = (biz as any)?.target_keywords;
+    return typeof kwRaw === "string"
+      ? kwRaw.split(",").map((s) => s.trim()).filter(Boolean)
+      : Array.isArray(kwRaw) ? kwRaw : [];
+  }, [biz]);
+
   const fallback = useMemo(
-    () => buildTemplates(bizName, biz.business_type ?? "shop", biz.city ?? ""),
-    [bizName, biz.business_type, biz.city],
+    () => buildTemplates(bizName, biz.business_type ?? "shop", biz.city ?? "", parsedKeywords),
+    [bizName, biz.business_type, biz.city, parsedKeywords],
   );
   const templates = aiItems ?? fallback;
 
@@ -109,15 +124,8 @@ function PublicReview() {
     setStep(rating <= 3 ? "negative" : "positive");
   }, [rating]);
 
-  useEffect(() => {
-    if (step !== "positive" || aiItems || aiLoading) return;
-    let cancelled = false;
+  const fetchFreshAiReviews = (forceSeed?: number) => {
     setAiLoading(true);
-
-    const kwRaw = (biz as any)?.target_keywords;
-    const targetKeywords = typeof kwRaw === "string"
-      ? kwRaw.split(",").map((s) => s.trim()).filter(Boolean)
-      : Array.isArray(kwRaw) ? kwRaw : [];
     const language = (biz as any)?.preferred_language || "English";
 
     writer({
@@ -127,24 +135,29 @@ function PublicReview() {
         businessType: biz.business_type ?? "shop",
         businessCity: biz.city ?? undefined,
         businessDescription: biz.description ?? undefined,
-        targetKeywords,
+        targetKeywords: parsedKeywords,
         language: (["English", "Hindi", "Gujarati", "Marathi"].includes(language) ? language : "English") as any,
         count: 5,
+        seed: forceSeed || Math.floor(Math.random() * 100000),
       },
     })
       .then((res) => {
-        if (cancelled) return;
         const items = (res.suggestions ?? [])
           .filter((s) => s.text?.trim())
           .map((s) => ({ text: s.text.trim(), keywords: (s.keywords ?? []).slice(0, 2) }));
-        if (items.length) setAiItems(items);
+        if (items.length) {
+          setAiItems(items);
+          if (items[0]?.text) setText(items[0].text);
+        }
       })
       .catch(() => {})
-      .finally(() => !cancelled && setAiLoading(false));
-    return () => {
-      cancelled = true;
-    };
-  }, [step, aiItems, aiLoading, writer, rating, bizName, biz.business_type, biz.city, biz.description, biz]);
+      .finally(() => setAiLoading(false));
+  };
+
+  useEffect(() => {
+    if (step !== "positive" || aiItems || aiLoading) return;
+    fetchFreshAiReviews();
+  }, [step, aiItems, aiLoading]);
 
   const submit = async (positive: boolean) => {
     const res = await fetch("/api/public/submit-review", {
@@ -265,10 +278,19 @@ function PublicReview() {
 
           {step === "positive" && (
             <>
-              <p className="mt-6 text-sm font-semibold">Pick a review — we'll copy it and take you to Google.</p>
+              <div className="mt-6 flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold">Pick a review — we'll copy it for Google.</p>
+                <button
+                  onClick={() => fetchFreshAiReviews(Math.floor(Math.random() * 100000))}
+                  disabled={aiLoading}
+                  className="text-xs font-mono font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 px-2.5 py-1 rounded-full border border-amber-200 inline-flex items-center gap-1 transition cursor-pointer"
+                >
+                  🎲 Generate New Review
+                </button>
+              </div>
               {aiLoading && (
-                <div className="mt-2 text-xs text-zinc-500 inline-flex items-center gap-1.5">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> AI is writing short reviews for you…
+                <div className="mt-2 text-xs text-zinc-500 inline-flex items-center gap-1.5 font-mono">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-600" /> AI is crafting fresh unique reviews with keywords…
                 </div>
               )}
               <div className="mt-3 space-y-2 max-h-[320px] overflow-y-auto pr-0.5">
