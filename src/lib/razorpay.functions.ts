@@ -46,6 +46,9 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
       if (!res.ok) {
         const errorText = await res.text();
         console.error("Razorpay Order API Error:", errorText);
+        if (res.status === 401 || errorText.includes("Authentication failed")) {
+          throw new Error("Razorpay Authentication Failed: Key Secret does not match Key ID in Razorpay Dashboard. Please regenerate API Keys.");
+        }
         throw new Error(`Failed to create Razorpay payment order: ${errorText}`);
       }
 
@@ -120,6 +123,9 @@ export const createRazorpayPaymentLink = createServerFn({ method: "POST" })
       if (!res.ok) {
         const errTxt = await res.text();
         console.error("Razorpay Payment Link API error:", errTxt);
+        if (res.status === 401 || errTxt.includes("Authentication failed")) {
+          throw new Error("Razorpay Authentication Failed: Key Secret does not match Key ID in Razorpay Dashboard. Please regenerate API Keys.");
+        }
         throw new Error(`Failed to generate Razorpay link: ${errTxt}`);
       }
 
