@@ -56,67 +56,6 @@ function Billing() {
 
     setLoadingPlan(planId);
     try {
-      const isLoaded = await loadRazorpaySdk();
-
-      // 1. Try Razorpay Embedded Checkout Modal if SDK is loaded
-      if (isLoaded && (window as any).Razorpay) {
-        try {
-          const orderRes = await createOrder({ data: { planId, userId: profile?.id } });
-          const options = {
-            key: orderRes.keyId,
-            amount: orderRes.amount,
-            currency: orderRes.currency,
-            name: "IntellectFlow",
-            description: `${orderRes.planName || plan.label} Subscription — 1 Month`,
-            order_id: orderRes.orderId,
-            prefill: {
-              name: profile?.business_name || "",
-              email: profile?.email || "",
-              contact: profile?.phone || "",
-            },
-            theme: {
-              color: "#14110E",
-            },
-            handler: async (response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) => {
-              toast.loading("Verifying payment with Razorpay...", { id: "rzp-verify" });
-              try {
-                const verifyRes = await verifyPayment({
-                  data: {
-                    orderId: response.razorpay_order_id,
-                    paymentId: response.razorpay_payment_id,
-                    signature: response.razorpay_signature,
-                    planId,
-                    userId: profile?.id,
-                  },
-                });
-
-                toast.success(verifyRes.message || "Payment successful! Your subscription is active.", { id: "rzp-verify" });
-                queryClient.invalidateQueries({ queryKey: ["profile"] });
-                queryClient.invalidateQueries({ queryKey: ["biz"] });
-              } catch (err) {
-                toast.error(err instanceof Error ? err.message : "Payment verification failed", { id: "rzp-verify" });
-              } finally {
-                setLoadingPlan(null);
-              }
-            },
-            modal: {
-              ondismiss: () => {
-                setLoadingPlan(null);
-                toast.info("Payment cancelled");
-              },
-            },
-          };
-
-          const rzp = new (window as any).Razorpay(options);
-          rzp.open();
-          setTimeout(() => setLoadingPlan(null), 2000);
-          return;
-        } catch (e) {
-          console.warn("Modal checkout failed, using Razorpay Payment Link fallback:", e);
-        }
-      }
-
-      // 2. Direct Hosted Razorpay Payment Link Fallback
       toast.info(`Opening Razorpay checkout for ${plan.label}...`);
       const linkRes = await createLink({
         data: {
