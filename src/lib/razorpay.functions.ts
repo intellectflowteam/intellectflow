@@ -158,8 +158,9 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
       .parse(raw),
   )
   .handler(async ({ data }) => {
-    const { keySecret } = getRazorpayKeys();
+    const { keyId, keySecret } = getRazorpayKeys();
 
+    // 1. Verify payment signature
     if (keySecret) {
       const generatedSignature = crypto
         .createHmac("sha256", keySecret)
@@ -171,21 +172,51 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
       }
     }
 
-    const plan = PLANS.find((p) => p.id === data.planId);
-    const price = plan ? plan.price : 299;
+    // 2. Query official Razorpay Order API to map EXACT plan based on paid amount
+    let finalPlanId: "starter" | "growth" | "pro" = data.planId;
+    let finalPrice = 299;
 
-    // Update profile subscription in Supabase with admin privileges
+    try {
+      const authHeader = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
+      const orderRes = await fetch(`https://api.razorpay.com/v1/orders/${data.orderId}`, {
+        headers: { Authorization: `Basic ${authHeader}` },
+      });
+      if (orderRes.ok) {
+        const orderData = await orderRes.json();
+        const amtPaise = Number(orderData.amount || 0);
+        if (amtPaise >= 129900) {
+          finalPlanId = "pro";
+          finalPrice = 1299;
+        } else if (amtPaise >= 59900) {
+          finalPlanId = "growth";
+          finalPrice = 599;
+        } else if (amtPaise >= 29900) {
+          finalPlanId = "starter";
+          finalPrice = 299;
+        } else if (orderData.notes?.planId && ["starter", "growth", "pro"].includes(orderData.notes.planId)) {
+          finalPlanId = orderData.notes.planId;
+          const p = PLANS.find((x) => x.id === finalPlanId);
+          finalPrice = p ? p.price : 299;
+        }
+      }
+    } catch (e) {
+      console.warn("Could not fetch order from Razorpay API for plan verification:", e);
+      const p = PLANS.find((x) => x.id === data.planId);
+      finalPrice = p ? p.price : 299;
+    }
+
+    // 3. Update profile subscription in Supabase with admin privileges
     if (data.userId) {
       try {
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         await supabaseAdmin
           .from("profiles")
           .update({
-            plan: data.planId,
-            plan_price: price,
+            plan: finalPlanId,
+            plan_price: finalPrice,
             subscription_status: "active",
             razorpay_payment_ref: data.paymentId,
-            razorpay_plan_id: data.planId,
+            razorpay_plan_id: finalPlanId,
           })
           .eq("id", data.userId);
       } catch (e) {
@@ -193,8 +224,9 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
       }
     }
 
+    const plan = PLANS.find((p) => p.id === finalPlanId);
     return {
       success: true,
-      message: `Congratulations! Your ${plan?.label || data.planId} plan is now active.`,
+      message: `Congratulations! Your ${plan?.label || finalPlanId} plan (₹${finalPrice}/mo) is now active.`,
     };
   });
