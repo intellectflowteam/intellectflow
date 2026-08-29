@@ -208,10 +208,24 @@ Return JSON: { "faqs": [ {"question":"...","answer":"..."} ] }`;
     const raw = await callAI(system, user);
     try {
       const cleaned = raw.replace(/^```json\s*|\s*```$/g, "").trim();
-      return JSON.parse(cleaned) as { faqs: { question: string; answer: string }[] };
-    } catch {
-      return { faqs: [] };
-    }
+      const parsed = JSON.parse(cleaned) as { faqs: { question: string; answer: string }[] };
+      if (parsed.faqs?.length) return parsed;
+    } catch {}
+
+    // Smart fallback FAQs if AI is rate-limited or unreachable
+    const name = data.businessName || "Our Business";
+    const city = data.businessCity || "your area";
+    const type = data.businessType || "shop";
+
+    return {
+      faqs: [
+        { question: `What are the working hours of ${name}?`, answer: `${name} in ${city} is open daily. Contact us or check Google Maps for exact daily timings.` },
+        { question: `Where is ${name} located in ${city}?`, answer: `${name} is conveniently located in ${city}. You can get exact driving directions from our Google Profile.` },
+        { question: `What services/products does ${name} specialize in?`, answer: `We specialize in top-quality ${type} solutions with customer-first service and affordable pricing.` },
+        { question: `Are digital payments (UPI, Cards, GPay) accepted at ${name}?`, answer: `Yes, we accept all popular digital payment options including Google Pay, PhonePe, Paytm, and cards.` },
+        { question: `How can I contact ${name} for inquiries?`, answer: `You can call us directly or visit our ${type} in ${city}. We are always happy to assist you!` },
+      ],
+    };
   });
 
 // Competitor SWOT — analyzes tracked competitors against this business
