@@ -199,34 +199,30 @@ function Billing() {
                 ))}
               </ul>
 
-              {access.lifetimeFree ? (
-                <div className="mt-6 w-full h-11 rounded-2xl bg-[#fdf6ef] border border-[var(--brass)]/30 grid place-items-center text-xs font-mono font-bold text-[var(--ink)]">
-                  <span className="inline-flex items-center gap-1.5"><Crown className="w-4 h-4 text-[var(--brass-deep)]" /> Included — Lifetime Free</span>
-                </div>
-              ) : (
-                <button
-                  disabled={isBusy || current}
-                  onClick={() => handleSelectPlan(p.id as PlanId)}
-                  className={[
-                    "mt-6 w-full h-11 rounded-2xl flex items-center justify-center gap-2 font-mono font-bold text-xs transition cursor-pointer shadow-2xs",
-                    current
-                      ? "bg-zinc-100 text-zinc-500 cursor-default"
-                      : "bg-gradient-to-r from-[var(--ink)] to-[#241F1A] text-white hover:brightness-125",
-                  ].join(" ")}
-                >
-                  {isBusy ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin text-[var(--brass)]" /> Initiating Payment...
-                    </>
-                  ) : current ? (
-                    "Active Plan"
-                  ) : (
-                    <>
-                      <CreditCard className="w-4 h-4 text-[var(--brass)]" /> Pay ₹{p.price} via Razorpay
-                    </>
-                  )}
-                </button>
-              )}
+              <button
+                disabled={isBusy}
+                onClick={() => handleSelectPlan(p.id as PlanId)}
+                className={[
+                  "mt-6 w-full h-11 rounded-2xl flex items-center justify-center gap-2 font-mono font-bold text-xs transition cursor-pointer shadow-2xs",
+                  current
+                    ? "bg-emerald-800 text-white hover:bg-emerald-900"
+                    : "bg-gradient-to-r from-[var(--ink)] to-[#241F1A] text-white hover:brightness-125",
+                ].join(" ")}
+              >
+                {isBusy ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-[var(--brass)]" /> Initiating Payment...
+                  </>
+                ) : current ? (
+                  <>
+                    <CreditCard className="w-4 h-4 text-emerald-400" /> Current Plan (Renew ₹{p.price})
+                  </>
+                ) : (
+                  <>
+                    <CreditCard className="w-4 h-4 text-[var(--brass)]" /> Pay ₹{p.price} via Razorpay
+                  </>
+                )}
+              </button>
             </div>
           );
         })}
