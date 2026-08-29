@@ -109,6 +109,7 @@ function Billing() {
 
           const rzp = new (window as any).Razorpay(options);
           rzp.open();
+          setTimeout(() => setLoadingPlan(null), 2000);
           return;
         } catch (e) {
           console.warn("Modal checkout failed, using Razorpay Payment Link fallback:", e);
@@ -116,7 +117,7 @@ function Billing() {
       }
 
       // 2. Direct Hosted Razorpay Payment Link Fallback
-      toast.info(`Redirecting to Razorpay checkout for ${plan.label}...`);
+      toast.info(`Opening Razorpay checkout for ${plan.label}...`);
       const linkRes = await createLink({
         data: {
           planId,
@@ -134,7 +135,8 @@ function Billing() {
     } catch (err) {
       console.error(err);
       toast.error(err instanceof Error ? err.message : "Could not initiate Razorpay payment");
-      setLoadingPlan(null);
+    } finally {
+      setTimeout(() => setLoadingPlan(null), 1500);
     }
   };
 
