@@ -3,6 +3,15 @@ import { z } from "zod";
 import crypto from "crypto";
 import { PLANS } from "./plans";
 
+function getRazorpayKeys() {
+  const rawKeyId = process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || "rzp_live_TVWj8KfdwUCtTh";
+  const rawKeySecret = process.env.RAZORPAY_KEY_SECRET || "cisNPwOOpcOCbeBfpmQlcyWU";
+  return {
+    keyId: rawKeyId.trim(),
+    keySecret: rawKeySecret.trim(),
+  };
+}
+
 // Server Function: Create Razorpay Order for a Subscription Plan
 export const createRazorpayOrder = createServerFn({ method: "POST" })
   .validator((raw: unknown) =>
@@ -14,8 +23,7 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
       .parse(raw),
   )
   .handler(async ({ data }) => {
-    const keyId = process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || "rzp_live_TBKF1Eoru1jSB5";
-    const keySecret = process.env.RAZORPAY_KEY_SECRET || "madm2Wo7p0tIAU9fZTW0BUDS";
+    const { keyId, keySecret } = getRazorpayKeys();
 
     const plan = PLANS.find((p) => p.id === data.planId);
     if (!plan) throw new Error("Invalid plan selected");
@@ -81,8 +89,7 @@ export const createRazorpayPaymentLink = createServerFn({ method: "POST" })
       .parse(raw),
   )
   .handler(async ({ data }) => {
-    const keyId = process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || "rzp_live_TBKF1Eoru1jSB5";
-    const keySecret = process.env.RAZORPAY_KEY_SECRET || "madm2Wo7p0tIAU9fZTW0BUDS";
+    const { keyId, keySecret } = getRazorpayKeys();
 
     const plan = PLANS.find((p) => p.id === data.planId);
     if (!plan) throw new Error("Invalid plan selected");
@@ -153,7 +160,7 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
       .parse(raw),
   )
   .handler(async ({ data }) => {
-    const keySecret = process.env.RAZORPAY_KEY_SECRET || "madm2Wo7p0tIAU9fZTW0BUDS";
+    const { keySecret } = getRazorpayKeys();
 
     if (keySecret) {
       const generatedSignature = crypto
