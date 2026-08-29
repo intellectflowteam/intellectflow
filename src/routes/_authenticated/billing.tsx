@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getMyProfile } from "@/lib/queries";
 import { PLANS, computeAccess, type PlanId } from "@/lib/plans";
-import { createRazorpayOrder, verifyRazorpayPayment } from "@/lib/razorpay.functions";
+import { createRazorpayOrder, createRazorpayPaymentLink, verifyRazorpayPayment } from "@/lib/razorpay.functions";
 import { Check, Crown, Clock, Zap, Loader2, CreditCard } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -28,10 +28,10 @@ function Billing() {
   const access = computeAccess(profile);
 
   const createOrder = useServerFn(createRazorpayOrder);
+  const createLink = useServerFn(createRazorpayPaymentLink);
   const verifyPayment = useServerFn(verifyRazorpayPayment);
 
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
-  const [razorpayLoaded, setRazorpayLoaded] = useState(false);
 
   const loadRazorpaySdk = (): Promise<boolean> => {
     if (typeof window === "undefined") return Promise.resolve(false);
@@ -57,79 +57,80 @@ function Billing() {
     setLoadingPlan(planId);
     try {
       const isLoaded = await loadRazorpaySdk();
-      if (!isLoaded || !(window as any).Razorpay) {
-        toast.error("Could not load Razorpay SDK. Please check your connection or disable adblockers.");
-        setLoadingPlan(null);
-        return;
-      }
 
-      const orderRes = await createOrder({ data: { planId, userId: profile?.id } });
+      // 1. Try Razorpay Embedded Checkout Modal if SDK is loaded
+      if (isLoaded && (window as any).Razorpay) {
+        try {
+          const orderRes = await createOrder({ data: { planId, userId: profile?.id } });
+          const options = {
+            key: orderRes.keyId,
+            amount: orderRes.amount,
+            currency: orderRes.currency,
+            name: "IntellectFlow",
+            description: `${orderRes.planName || plan.label} Subscription — 1 Month`,
+            order_id: orderRes.orderId,
+            prefill: {
+              name: profile?.business_name || "",
+              email: profile?.email || "",
+              contact: profile?.phone || "",
+            },
+            theme: {
+              color: "#14110E",
+            },
+            handler: async (response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) => {
+              toast.loading("Verifying payment with Razorpay...", { id: "rzp-verify" });
+              try {
+                const verifyRes = await verifyPayment({
+                  data: {
+                    orderId: response.razorpay_order_id,
+                    paymentId: response.razorpay_payment_id,
+                    signature: response.razorpay_signature,
+                    planId,
+                    userId: profile?.id,
+                  },
+                });
 
-      if ((orderRes as any).isFallback) {
-        if ((orderRes as any).paymentLink && !(orderRes as any).paymentLink.includes("REPLACE_WITH")) {
-          window.open((orderRes as any).paymentLink, "_blank");
-          toast.info(`Redirecting to Razorpay payment page for ${plan.label}...`);
-        } else {
-          toast.error("Razorpay API Keys missing. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in .env file.");
-        }
-        setLoadingPlan(null);
-        return;
-      }
-
-      if (!(window as any).Razorpay) {
-        toast.error("Razorpay SDK is loading. Please try again in a moment.");
-        setLoadingPlan(null);
-        return;
-      }
-
-      const options = {
-        key: orderRes.keyId,
-        amount: orderRes.amount,
-        currency: orderRes.currency,
-        name: "IntellectFlow",
-        description: `${orderRes.planName || plan.label} Subscription — 1 Month`,
-        image: "/favicon.svg",
-        order_id: orderRes.orderId,
-        prefill: {
-          name: profile?.business_name || "",
-          email: profile?.email || "",
-          contact: profile?.phone || "",
-        },
-        theme: {
-          color: "#14110E",
-        },
-        handler: async (response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) => {
-          toast.loading("Verifying payment with Razorpay...", { id: "rzp-verify" });
-          try {
-            const verifyRes = await verifyPayment({
-              data: {
-                orderId: response.razorpay_order_id,
-                paymentId: response.razorpay_payment_id,
-                signature: response.razorpay_signature,
-                planId,
-                userId: profile?.id,
+                toast.success(verifyRes.message || "Payment successful! Your subscription is active.", { id: "rzp-verify" });
+                queryClient.invalidateQueries({ queryKey: ["profile"] });
+                queryClient.invalidateQueries({ queryKey: ["biz"] });
+              } catch (err) {
+                toast.error(err instanceof Error ? err.message : "Payment verification failed", { id: "rzp-verify" });
+              } finally {
+                setLoadingPlan(null);
+              }
+            },
+            modal: {
+              ondismiss: () => {
+                setLoadingPlan(null);
+                toast.info("Payment cancelled");
               },
-            });
+            },
+          };
 
-            toast.success(verifyRes.message || "Payment successful! Your subscription is active.", { id: "rzp-verify" });
-            queryClient.invalidateQueries({ queryKey: ["profile"] });
-            queryClient.invalidateQueries({ queryKey: ["biz"] });
-          } catch (err) {
-            toast.error(err instanceof Error ? err.message : "Payment verification failed", { id: "rzp-verify" });
-          } finally {
-            setLoadingPlan(null);
-          }
-        },
-        modal: {
-          ondismiss: () => {
-            setLoadingPlan(null);
-            toast.info("Payment cancelled");
-          },
-        },
-      };
+          const rzp = new (window as any).Razorpay(options);
+          rzp.open();
+          return;
+        } catch (e) {
+          console.warn("Modal checkout failed, using Razorpay Payment Link fallback:", e);
+        }
+      }
 
-      const rzp = new (window as any).Razorpay(options);
-      rzp.open();
+      // 2. Direct Hosted Razorpay Payment Link Fallback
+      toast.info(`Redirecting to Razorpay checkout for ${plan.label}...`);
+      const linkRes = await createLink({
+        data: {
+          planId,
+          userId: profile?.id,
+          email: profile?.email || undefined,
+          name: profile?.business_name || undefined,
+        },
+      });
+
+      if (linkRes.paymentLinkUrl) {
+        window.location.href = linkRes.paymentLinkUrl;
+      } else {
+        throw new Error("Could not generate payment link");
+      }
     } catch (err) {
       console.error(err);
       toast.error(err instanceof Error ? err.message : "Could not initiate Razorpay payment");

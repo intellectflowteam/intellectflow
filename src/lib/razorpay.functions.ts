@@ -65,6 +65,74 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
     }
   });
 
+// Server Function: Create Razorpay Payment Link (Direct URL fallback)
+export const createRazorpayPaymentLink = createServerFn({ method: "POST" })
+  .validator((raw: unknown) =>
+    z
+      .object({
+        planId: z.enum(["starter", "growth", "pro"]),
+        userId: z.string().optional(),
+        email: z.string().optional(),
+        name: z.string().optional(),
+      })
+      .parse(raw),
+  )
+  .handler(async ({ data }) => {
+    const keyId = process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || "rzp_live_TBKF1Eoru1jSB5";
+    const keySecret = process.env.RAZORPAY_KEY_SECRET || "madm2Wo7p0tIAU9fZTW0BUDS";
+
+    const plan = PLANS.find((p) => p.id === data.planId);
+    if (!plan) throw new Error("Invalid plan selected");
+
+    const amountInPaise = plan.price * 100;
+    const authHeader = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
+
+    try {
+      const res = await fetch("https://api.razorpay.com/v1/payment_links", {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${authHeader}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          amount: amountInPaise,
+          currency: "INR",
+          accept_partial: false,
+          description: `IntellectFlow ${plan.label} Plan Subscription`,
+          customer: {
+            name: data.name || "Customer",
+            email: data.email || "customer@intellectflows.in",
+          },
+          notify: {
+            sms: false,
+            email: true,
+          },
+          reminder_enable: true,
+          notes: {
+            userId: data.userId || "",
+            planId: data.planId,
+          },
+          callback_url: "https://www.intellectflows.in/billing?payment_status=success",
+          callback_method: "get",
+        }),
+      });
+
+      if (!res.ok) {
+        const errTxt = await res.text();
+        console.error("Razorpay Payment Link API error:", errTxt);
+        throw new Error(`Failed to generate Razorpay link: ${errTxt}`);
+      }
+
+      const json = await res.json();
+      return {
+        paymentLinkUrl: json.short_url as string,
+      };
+    } catch (err) {
+      console.error("Razorpay Payment Link exception:", err);
+      throw err;
+    }
+  });
+
 // Server Function: Verify Razorpay Payment Signature & Activate Plan in Supabase
 export const verifyRazorpayPayment = createServerFn({ method: "POST" })
   .validator((raw: unknown) =>
