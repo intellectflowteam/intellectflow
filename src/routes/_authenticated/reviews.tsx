@@ -120,7 +120,8 @@ function Reviews() {
                       <AiReplyBox
                         review={r}
                         businessName={biz?.name ?? undefined}
-                        businessDescription={(biz as any)?.description || undefined}
+                        targetKeywords={(biz as any)?.target_keywords ? (biz as any).target_keywords.split(",").map((s: string) => s.trim()).filter(Boolean) : []}
+                        preferredLanguage={(biz as any)?.preferred_language || "English"}
                         mapsUri={google.data.google_maps_uri}
                       />
                     </div>
@@ -196,12 +197,14 @@ function AutoReplySuggestion({ suggestion }: { suggestion: { replies?: { lang: s
 function AiReplyBox({
   review,
   businessName,
-  businessDescription,
+  targetKeywords,
+  preferredLanguage,
   mapsUri,
 }: {
   review: { author: string; rating: number; text: string; time: string };
   businessName?: string;
-  businessDescription?: string;
+  targetKeywords?: string[];
+  preferredLanguage?: string;
   mapsUri?: string;
 }) {
   const gen = useServerFn(aiReply);
@@ -215,14 +218,15 @@ function AiReplyBox({
         data: {
           reviewText: `Reviewer name: ${review.author}. Review: ${review.text || "(no text, rating only)"}`,
           rating: Math.max(1, Math.min(5, Math.round(review.rating) || 5)),
-          businessName,
-          businessDescription,
+          businessName: businessName || "Our Business",
+          targetKeywords: targetKeywords || [],
+          preferredLanguage: (["English", "Hindi", "Gujarati", "Marathi"].includes(preferredLanguage || "") ? preferredLanguage : "English") as any,
         },
       });
       const first = res.replies?.[0]?.text ?? "";
       if (!first) throw new Error("No reply generated");
       await navigator.clipboard.writeText(first).catch(() => {});
-      toast.success("Reply copied — paste it on Google");
+      toast.success("AI Reply generated with SEO keywords & copied!");
       const url = mapsUri || "https://business.google.com/reviews";
       if (win) win.location.href = url;
       else window.open(url, "_blank");

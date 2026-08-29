@@ -11,7 +11,17 @@ function Settings() {
   const { data: biz } = useQuery({ queryKey: ["biz"], queryFn: getMyBusiness });
   const { data: profile } = useQuery({ queryKey: ["profile"], queryFn: getMyProfile });
   const qc = useQueryClient();
-  const [form, setForm] = useState({ name: "", phone: "", city: "", gmb_link: "", address: "", description: "", website: "" });
+  const [form, setForm] = useState({
+    name: "",
+    phone: "",
+    city: "",
+    gmb_link: "",
+    address: "",
+    description: "",
+    website: "",
+    target_keywords: "",
+    preferred_language: "English",
+  });
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -23,6 +33,8 @@ function Settings() {
       address: biz.address ?? "",
       description: (biz as any).description ?? "",
       website: (biz as any).website ?? "",
+      target_keywords: (biz as any).target_keywords ?? "",
+      preferred_language: (biz as any).preferred_language ?? "English",
     });
   }, [biz, profile]);
 
@@ -33,36 +45,70 @@ function Settings() {
       await supabase.from("businesses").update({
         name: form.name, city: form.city, gmb_link: form.gmb_link, address: form.address,
         phone: form.phone, description: form.description, website: form.website,
+        target_keywords: form.target_keywords, preferred_language: form.preferred_language,
       } as any).eq("id", biz.id);
       await supabase.from("profiles").update({ business_name: form.name, city: form.city, phone: form.phone }).eq("id", profile!.id);
       qc.invalidateQueries();
-      toast.success("Saved");
+      toast.success("Settings saved successfully!");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed");
     } finally { setBusy(false); }
   };
 
   return (
-    <div className="space-y-4 max-w-xl">
+    <div className="space-y-4 max-w-xl pb-10">
       <h1 className="font-black text-2xl">Settings</h1>
-      <div className="bg-white border border-black/10 rounded-2xl p-4 md:p-5 space-y-3">
+      <div className="bg-white border border-black/10 rounded-2xl p-4 md:p-5 space-y-4 shadow-2xs">
         {(["name", "phone", "city", "address", "gmb_link", "website"] as const).map((k) => (
           <div key={k}>
             <label className="text-xs font-semibold text-zinc-600 capitalize">{k.replace("_", " ")}</label>
-            <input value={form[k]} onChange={(e) => setForm({ ...form, [k]: e.target.value })} className="mt-1 w-full h-11 rounded-lg border border-black/15 px-3 text-sm" />
+            <input value={form[k]} onChange={(e) => setForm({ ...form, [k]: e.target.value })} className="mt-1 w-full h-11 rounded-lg border border-black/15 px-3 text-sm focus:outline-hidden focus:ring-2 focus:ring-black/10" />
           </div>
         ))}
-        <div>
-          <label className="text-xs font-semibold text-zinc-600">Business description (used by AI)</label>
-          <textarea
-            value={form.description}
-            onChange={(e) => setForm({ ...form, description: e.target.value })}
-            rows={5}
-            placeholder="What makes your business special — specialties, hours, USP. AI uses this to write better reviews and replies."
-            className="mt-1 w-full rounded-lg border border-black/15 px-3 py-2 text-sm"
-          />
+
+        <div className="pt-2 border-t border-black/10 space-y-4">
+          <h2 className="text-sm font-bold text-[#18181B] uppercase tracking-wider font-mono">🤖 AI & SEO Customization</h2>
+
+          <div>
+            <label className="text-xs font-semibold text-zinc-600">Target SEO Keywords (Comma separated)</label>
+            <input
+              value={form.target_keywords}
+              onChange={(e) => setForm({ ...form, target_keywords: e.target.value })}
+              placeholder="e.g. best tea, fast service, clean ambiance, affordable price"
+              className="mt-1 w-full h-11 rounded-lg border border-black/15 px-3 text-sm focus:outline-hidden focus:ring-2 focus:ring-black/10"
+            />
+            <p className="mt-1 text-[11px] text-zinc-500">AI automatically weaves these keywords into customer reviews, replies &amp; GMB posts.</p>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-zinc-600">Preferred AI Language</label>
+            <select
+              value={form.preferred_language}
+              onChange={(e) => setForm({ ...form, preferred_language: e.target.value })}
+              className="mt-1 w-full h-11 rounded-lg border border-black/15 px-3 text-sm bg-white font-medium focus:outline-hidden focus:ring-2 focus:ring-black/10"
+            >
+              <option value="English">🇬🇧 English</option>
+              <option value="Hindi">🇮🇳 Hindi (हिंदी / Hinglish)</option>
+              <option value="Gujarati">🚩 Gujarati (ગુજરાતી / Gujlish)</option>
+              <option value="Marathi">🌺 Marathi (मराठी)</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-zinc-600">Business description (used by AI)</label>
+            <textarea
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              rows={4}
+              placeholder="What makes your business special — specialties, hours, USP. AI uses this to write better reviews and replies."
+              className="mt-1 w-full rounded-lg border border-black/15 px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-black/10"
+            />
+          </div>
         </div>
-        <button onClick={save} disabled={busy} className="h-11 px-5 rounded-lg bg-black text-white font-bold text-sm disabled:opacity-60">{busy ? "Saving…" : "Save"}</button>
+
+        <button onClick={save} disabled={busy} className="h-11 px-6 rounded-xl bg-[#18181B] text-white font-bold text-sm hover:bg-black transition cursor-pointer disabled:opacity-60">
+          {busy ? "Saving…" : "Save Preferences"}
+        </button>
       </div>
     </div>
   );

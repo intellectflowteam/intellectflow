@@ -12,7 +12,7 @@ export const Route = createFileRoute("/r/$slug")({
     // 1. Exact match
     let { data } = await supabase
       .from("businesses_public")
-      .select("id, name, slug, gmb_link, rating, total_reviews, city, address, description, business_type, photo_url")
+      .select("*")
       .eq("slug", params.slug)
       .maybeSingle();
 
@@ -23,21 +23,21 @@ export const Route = createFileRoute("/r/$slug")({
       // Try 3-word prefix
       if (!data && parts.length >= 3) {
         const p3 = parts.slice(0, 3).join("-");
-        const res = await supabase.from("businesses_public").select("id, name, slug, gmb_link, rating, total_reviews, city, address, description, business_type, photo_url").ilike("slug", `${p3}%`).limit(1).maybeSingle();
+        const res = await supabase.from("businesses_public").select("*").ilike("slug", `${p3}%`).limit(1).maybeSingle();
         if (res.data) data = res.data;
       }
 
       // Try 2-word prefix
       if (!data && parts.length >= 2) {
         const p2 = parts.slice(0, 2).join("-");
-        const res = await supabase.from("businesses_public").select("id, name, slug, gmb_link, rating, total_reviews, city, address, description, business_type, photo_url").ilike("slug", `${p2}%`).limit(1).maybeSingle();
+        const res = await supabase.from("businesses_public").select("*").ilike("slug", `${p2}%`).limit(1).maybeSingle();
         if (res.data) data = res.data;
       }
 
       // Try 1-word prefix
       if (!data && parts.length >= 1 && parts[0].length >= 3) {
         const p1 = parts[0];
-        const res = await supabase.from("businesses_public").select("id, name, slug, gmb_link, rating, total_reviews, city, address, description, business_type, photo_url").ilike("slug", `${p1}%`).limit(1).maybeSingle();
+        const res = await supabase.from("businesses_public").select("*").ilike("slug", `${p1}%`).limit(1).maybeSingle();
         if (res.data) data = res.data;
       }
     }
@@ -113,6 +113,13 @@ function PublicReview() {
     if (step !== "positive" || aiItems || aiLoading) return;
     let cancelled = false;
     setAiLoading(true);
+
+    const kwRaw = (biz as any)?.target_keywords;
+    const targetKeywords = typeof kwRaw === "string"
+      ? kwRaw.split(",").map((s) => s.trim()).filter(Boolean)
+      : Array.isArray(kwRaw) ? kwRaw : [];
+    const language = (biz as any)?.preferred_language || "English";
+
     writer({
       data: {
         rating,
@@ -120,6 +127,8 @@ function PublicReview() {
         businessType: biz.business_type ?? "shop",
         businessCity: biz.city ?? undefined,
         businessDescription: biz.description ?? undefined,
+        targetKeywords,
+        language: (["English", "Hindi", "Gujarati", "Marathi"].includes(language) ? language : "English") as any,
         count: 5,
       },
     })
@@ -135,7 +144,7 @@ function PublicReview() {
     return () => {
       cancelled = true;
     };
-  }, [step, aiItems, aiLoading, writer, rating, bizName, biz.business_type, biz.city, biz.description]);
+  }, [step, aiItems, aiLoading, writer, rating, bizName, biz.business_type, biz.city, biz.description, biz]);
 
   const submit = async (positive: boolean) => {
     const res = await fetch("/api/public/submit-review", {

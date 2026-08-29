@@ -47,6 +47,51 @@ async function callAI(system: string, user: string) {
 }
 
 // AI Writer — short review suggestions, each with 2 relevant SEO keywords
+// Helper to generate SVG promo banner for GMB posts
+function generatePostBannerSvg(businessName: string, offerOrEvent: string, keywords: string[] = []): string {
+  const cleanTitle = (businessName || "Special Offer").replace(/[<>&'"]/g, "").slice(0, 45);
+  const cleanOffer = (offerOrEvent || "Visit us for best services & special deals!").replace(/[<>&'"]/g, "").slice(0, 90);
+  const kwBadges = keywords.map((k) => k.replace(/[<>&'"]/g, "")).slice(0, 3);
+  
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+    <defs>
+      <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#0f172a" />
+        <stop offset="50%" stop-color="#1e1b4b" />
+        <stop offset="100%" stop-color="#020617" />
+      </linearGradient>
+      <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" stop-color="#f59e0b" />
+        <stop offset="100%" stop-color="#d97706" />
+      </linearGradient>
+    </defs>
+    <rect width="1200" height="630" fill="url(#bg)" />
+    <circle cx="1050" cy="120" r="280" fill="#f59e0b" opacity="0.15" />
+    <circle cx="150" cy="520" r="220" fill="#6366f1" opacity="0.18" />
+    
+    <rect x="80" y="70" width="280" height="42" rx="21" fill="#f59e0b" opacity="0.2" stroke="#f59e0b" stroke-width="1.5" />
+    <text x="220" y="96" fill="#fbbf24" font-family="system-ui, sans-serif" font-size="15" font-weight="800" text-anchor="middle" letter-spacing="2">EXCLUSIVE OFFER</text>
+
+    <text x="80" y="195" fill="#ffffff" font-family="system-ui, sans-serif" font-size="52" font-weight="900" letter-spacing="-1">${cleanTitle}</text>
+
+    <rect x="80" y="235" width="1040" height="190" rx="24" fill="#ffffff" fill-opacity="0.06" stroke="#ffffff" stroke-opacity="0.12" stroke-width="1.5" />
+    <text x="120" y="315" fill="#f3f4f6" font-family="system-ui, sans-serif" font-size="32" font-weight="700">${cleanOffer}</text>
+    
+    ${kwBadges.map((kw, idx) => `
+      <rect x="${120 + idx * 250}" y="360" width="230" height="36" rx="18" fill="#ffffff" fill-opacity="0.12" />
+      <text x="${235 + idx * 250}" y="383" fill="#fbbf24" font-family="system-ui, sans-serif" font-size="14" font-weight="700" text-anchor="middle"># ${kw}</text>
+    `).join('')}
+
+    <rect x="80" y="475" width="320" height="64" rx="32" fill="url(#gold)" />
+    <text x="240" y="515" fill="#000000" font-family="system-ui, sans-serif" font-size="20" font-weight="900" text-anchor="middle" letter-spacing="1">VISIT US TODAY</text>
+
+    <text x="1120" y="515" fill="#9ca3af" font-family="system-ui, sans-serif" font-size="16" font-weight="600" text-anchor="end">Google Verified Business</text>
+  </svg>`;
+  
+  return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
+}
+
+// AI Writer — short review suggestions, using target keywords & chosen language (English, Hindi, Gujarati, Marathi)
 export const aiWriter = createServerFn({ method: "POST" })
   .inputValidator((raw: unknown) =>
     z.object({
@@ -55,14 +100,18 @@ export const aiWriter = createServerFn({ method: "POST" })
       businessType: z.string().default("shop"),
       businessCity: z.string().max(120).optional(),
       businessDescription: z.string().max(2000).optional(),
+      targetKeywords: z.array(z.string()).optional(),
+      language: z.enum(["English", "Hindi", "Gujarati", "Marathi"]).default("English"),
       count: z.number().min(1).max(8).default(5),
     }).parse(raw),
   )
   .handler(async ({ data }) => {
+    const kwStr = (data.targetKeywords || []).filter(Boolean).join(", ");
     const system = `You write short 1-2 sentence Google reviews from a customer's perspective. Return STRICT JSON only, no markdown fences.`;
     const user = `Business: ${data.businessName} (${data.businessType})${data.businessCity ? ` in ${data.businessCity}` : ""}
 ${data.businessDescription ? `About: ${data.businessDescription}\n` : ""}Rating: ${data.rating}/5 stars.
-Write ${data.count} DIFFERENT, natural, authentic reviews in mix of simple English, Hindi & Gujarati transliteration.
+${kwStr ? `Target SEO Keywords to incorporate naturally: ${kwStr}\n` : ""}Language: Write in ${data.language} (or natural Roman ${data.language} script).
+Write ${data.count} DIFFERENT, natural, authentic reviews.
 Each review must include 2 short SEO keywords relevant to this business type.
 Return JSON: { "suggestions": [ {"text":"...", "keywords":["kw1","kw2"]} ] }`;
     const raw = await callAI(system, user);
@@ -74,22 +123,26 @@ Return JSON: { "suggestions": [ {"text":"...", "keywords":["kw1","kw2"]} ] }`;
     }
   });
 
-// AI Review reply generator — Hindi, Gujarati & English options
+// AI Review reply generator — Personalized in Hindi, Gujarati, English & Marathi with SEO keywords
 export const aiReply = createServerFn({ method: "POST" })
   .inputValidator((raw: unknown) =>
     z.object({
       businessName: z.string().min(1).max(120),
       reviewText: z.string().min(1).max(2000),
       rating: z.number().min(1).max(5),
+      targetKeywords: z.array(z.string()).optional(),
+      preferredLanguage: z.enum(["English", "Hindi", "Gujarati", "Marathi"]).optional(),
     }).parse(raw),
   )
   .handler(async ({ data }) => {
-    const system = `You are a polite owner of ${data.businessName}. Write 3 reply variants for a customer review:
-1. Hinglish (natural Roman Hindi)
-2. Gujarati (Roman Gujarati)
-3. English (professional)
-Return JSON: { "replies": [ {"lang":"Hinglish","text":"..."}, {"lang":"Gujarati","text":"..."}, {"lang":"English","text":"..."} ] }
-Each about 30 words, warm and specific. If rating <= 2, apologize and invite the customer to reach out.`;
+    const kwStr = (data.targetKeywords || []).filter(Boolean).join(", ");
+    const system = `You are a polite owner of ${data.businessName}. Write 4 reply variants for a customer review:
+1. Hindi / Hinglish (natural Roman/Devanagari Hindi)
+2. Gujarati (natural Gujarati)
+3. Marathi (natural Devanagari Marathi)
+4. English (professional)
+Return JSON: { "replies": [ {"lang":"Hinglish","text":"..."}, {"lang":"Gujarati","text":"..."}, {"lang":"Marathi","text":"..."}, {"lang":"English","text":"..."} ] }
+Each about 30 words, warm and specific. Incorporate owner's target SEO keywords if relevant: ${kwStr || "quality service, customer satisfaction"}. If rating <= 2, apologize and invite customer to reach out.`;
     const user = `Review (${data.rating} stars): "${data.reviewText}"`;
     const raw = await callAI(system, user);
     try {
@@ -100,28 +153,33 @@ Each about 30 words, warm and specific. If rating <= 2, apologize and invite the
     }
   });
 
-// GMB Post generator
+// GMB Post & Visual Promo Banner Generator
 export const gmbPost = createServerFn({ method: "POST" })
   .inputValidator((raw: unknown) =>
     z.object({
       businessName: z.string().min(1).max(120),
       offerOrEvent: z.string().min(1).max(400),
+      targetKeywords: z.array(z.string()).optional(),
+      language: z.enum(["English", "Hindi", "Gujarati", "Marathi"]).default("English"),
     }).parse(raw),
   )
   .handler(async ({ data }) => {
-    const system = `You write engaging Google Business Profile posts for Indian small businesses. About 90-110 words, include a clear CTA and 3-5 relevant hashtags.`;
-    const user = `Business: ${data.businessName}\nOffer/event: ${data.offerOrEvent}\nReturn only the post text.`;
+    const kwList = (data.targetKeywords || []).filter(Boolean);
+    const kwStr = kwList.join(", ");
+    const system = `You write engaging Google Business Profile posts for Indian small businesses. About 90-110 words, include a clear CTA, target SEO keywords, and 3-5 relevant hashtags.`;
+    const user = `Business: ${data.businessName}\nOffer/event: ${data.offerOrEvent}\nTarget Keywords: ${kwStr || "best service, special offer"}\nLanguage: ${data.language}\nReturn only the post text.`;
 
     const aiResult = await callAI(system, user);
+    const imageUrl = generatePostBannerSvg(data.businessName, data.offerOrEvent, kwList.length ? kwList : ["SpecialOffer", "BestQuality"]);
+
     if (aiResult && aiResult.trim()) {
-      return { content: aiResult.trim() };
+      return { content: aiResult.trim(), imageUrl };
     }
 
-    // Instant high-quality fallback post if AI model is unreachable
     const tag = data.businessName.replace(/[^a-zA-Z0-9]/g, '');
-    const fallbackPost = `🎉 Special Offer from ${data.businessName}! 🎉\n\n${data.offerOrEvent}\n\nVisit us today to enjoy the best quality, great prices & warm service. Don't forget to show this post at the counter for your special discount!\n\n📍 Location: Find ${data.businessName} on Google Maps\n📞 Contact us today for details!\n\n#${tag || 'LocalBusiness'} #SpecialOffer #GoogleBusiness #BestQuality`;
+    const fallbackPost = `🎉 Special Offer from ${data.businessName}! 🎉\n\n${data.offerOrEvent}\n\nVisit us today to enjoy the best quality, great prices & warm service. Don't forget to show this post at the counter for your special discount!\n\n📍 Location: Find ${data.businessName} on Google Maps\n📞 Contact us today for details!\n\n#${tag || 'LocalBusiness'} #SpecialOffer #GoogleBusiness #BestQuality ${kwList.map(k => '#' + k.replace(/\s+/g, '')).join(' ')}`;
 
-    return { content: fallbackPost };
+    return { content: fallbackPost, imageUrl };
   });
 
 // Auto FAQ Generator — builds Google-Business-Profile-ready Q&A pairs
