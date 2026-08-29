@@ -153,29 +153,37 @@ function Billing() {
             <div className="mt-1 inline-flex items-center gap-2 font-display font-black text-xl text-[var(--ink)]">
               <Crown className="w-5 h-5 text-[var(--brass-deep)]" /> Lifetime Free Access
             </div>
-          ) : (
+          ) : access.isPaid ? (
             <div className="mt-1 font-display font-black text-xl capitalize text-[var(--ink)]">
-              {PLANS.find((p) => p.id === access.plan)?.label ?? "Starter"} · ₹{PLANS.find((p) => p.id === access.plan)?.price ?? 299}/mo
+              {PLANS.find((p) => p.id === access.plan)?.label ?? "Starter"} Plan · Active (₹{PLANS.find((p) => p.id === access.plan)?.price ?? 299}/mo)
+            </div>
+          ) : access.onTrial ? (
+            <div className="mt-1 font-display font-black text-xl text-amber-700">
+              Free Demo / Trial Mode ({access.trialDaysLeft} Day{access.trialDaysLeft === 1 ? "" : "s"} Left)
+            </div>
+          ) : (
+            <div className="mt-1 font-display font-black text-xl text-rose-600">
+              Free Demo Trial Ended — Select Plan Below
             </div>
           )}
         </div>
         {access.lifetimeFree ? (
           <span className="text-xs font-mono font-bold bg-[var(--brass-deep)] text-white px-3 py-1.5 rounded-full">Granted by IntellectFlow — No Billing</span>
-        ) : access.onTrial ? (
-          <span className="inline-flex items-center gap-1.5 text-xs font-mono font-bold bg-emerald-100 text-emerald-800 px-3 py-1.5 rounded-full">
-            <Clock className="w-3.5 h-3.5" /> {access.trialDaysLeft} day{access.trialDaysLeft === 1 ? "" : "s"} left in free trial
-          </span>
-        ) : access.expired ? (
-          <span className="text-xs font-mono font-bold bg-rose-100 text-rose-800 px-3 py-1.5 rounded-full">Trial ended — Upgrade to unlock 25 tools</span>
-        ) : (
+        ) : access.isPaid ? (
           <span className="text-xs font-mono font-bold bg-emerald-100 text-emerald-800 px-3 py-1.5 rounded-full">Subscription active (Razorpay)</span>
+        ) : access.onTrial ? (
+          <span className="inline-flex items-center gap-1.5 text-xs font-mono font-bold bg-amber-100 text-amber-800 px-3 py-1.5 rounded-full">
+            <Clock className="w-3.5 h-3.5" /> Free Demo Trial Active
+          </span>
+        ) : (
+          <span className="text-xs font-mono font-bold bg-rose-100 text-rose-800 px-3 py-1.5 rounded-full">Trial ended — Select plan below</span>
         )}
       </div>
 
       {/* Plans */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
         {PLANS.map((p) => {
-          const current = !access.lifetimeFree && access.plan === (p.id as PlanId);
+          const current = access.isPaid && access.plan === (p.id as PlanId);
           const isBusy = loadingPlan === p.id;
 
           return (
@@ -226,7 +234,7 @@ function Billing() {
                   </>
                 ) : current ? (
                   <>
-                    <CreditCard className="w-4 h-4 text-emerald-400" /> Current Plan (Renew ₹{p.price})
+                    <CreditCard className="w-4 h-4 text-emerald-400" /> Active Subscription (Renew ₹{p.price})
                   </>
                 ) : (
                   <>

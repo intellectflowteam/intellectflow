@@ -119,6 +119,7 @@ export type AccessState = {
   onTrial: boolean;
   trialDaysLeft: number;
   expired: boolean;
+  isPaid: boolean;
   plan: PlanId;
 };
 
@@ -133,12 +134,13 @@ export function computeAccess(profile: {
   const plan = ((profile?.plan as PlanId) ?? "starter") as PlanId;
   const lifetimeFree = !!(profile?.lifetime_free || profile?.is_founder_free);
   const status = profile?.subscription_status ?? "trialing";
+  const isPaid = !lifetimeFree && status === "active";
   const endsAt = profile?.trial_ends_at
     ? new Date(profile.trial_ends_at)
     : new Date(new Date(profile?.created_at ?? Date.now()).getTime() + TRIAL_DAYS * 86400000);
   const msLeft = endsAt.getTime() - Date.now();
   const trialDaysLeft = Math.max(0, Math.ceil(msLeft / 86400000));
-  const onTrial = !lifetimeFree && status === "trialing" && msLeft > 0;
-  const expired = !lifetimeFree && status === "trialing" && msLeft <= 0;
-  return { lifetimeFree, onTrial, trialDaysLeft, expired, plan };
+  const onTrial = !lifetimeFree && !isPaid && msLeft > 0;
+  const expired = !lifetimeFree && !isPaid && msLeft <= 0;
+  return { lifetimeFree, onTrial, trialDaysLeft, expired, isPaid, plan };
 }
