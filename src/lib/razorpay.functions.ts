@@ -15,8 +15,8 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
       .parse(raw),
   )
   .handler(async ({ data, context }) => {
-    const keyId = process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID;
-    const keySecret = process.env.RAZORPAY_KEY_SECRET;
+    const keyId = process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || "rzp_live_TBKF1Eoru1jSB5";
+    const keySecret = process.env.RAZORPAY_KEY_SECRET || "madm2Wo7p0tIAU9fZTW0BUDS";
 
     const plan = PLANS.find((p) => p.id === data.planId);
     if (!plan) throw new Error("Invalid plan selected");
@@ -92,7 +92,7 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
       .parse(raw),
   )
   .handler(async ({ data, context }) => {
-    const keySecret = process.env.RAZORPAY_KEY_SECRET;
+    const keySecret = process.env.RAZORPAY_KEY_SECRET || "madm2Wo7p0tIAU9fZTW0BUDS";
 
     if (keySecret) {
       const generatedSignature = crypto

@@ -33,19 +33,21 @@ function Billing() {
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [razorpayLoaded, setRazorpayLoaded] = useState(false);
 
-  useEffect(() => {
-    // Dynamically load Razorpay Checkout SDK script
-    const script = document.createElement("script");
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
-    script.async = true;
-    script.onload = () => setRazorpayLoaded(true);
-    document.body.appendChild(script);
+  const loadRazorpaySdk = (): Promise<boolean> => {
+    if (typeof window === "undefined") return Promise.resolve(false);
+    if ((window as any).Razorpay) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.async = true;
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
 
-    return () => {
-      if (document.body.contains(script)) {
-        document.body.removeChild(script);
-      }
-    };
+  useEffect(() => {
+    loadRazorpaySdk();
   }, []);
 
   const handleSelectPlan = async (planId: PlanId) => {
@@ -54,6 +56,13 @@ function Billing() {
 
     setLoadingPlan(planId);
     try {
+      const isLoaded = await loadRazorpaySdk();
+      if (!isLoaded || !(window as any).Razorpay) {
+        toast.error("Could not load Razorpay SDK. Please check your connection or disable adblockers.");
+        setLoadingPlan(null);
+        return;
+      }
+
       const orderRes = await createOrder({ data: { planId } });
 
       if (orderRes.isFallback) {
