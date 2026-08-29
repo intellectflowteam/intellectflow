@@ -63,11 +63,11 @@ function Billing() {
         return;
       }
 
-      const orderRes = await createOrder({ data: { planId } });
+      const orderRes = await createOrder({ data: { planId, userId: profile?.id } });
 
-      if (orderRes.isFallback) {
-        if (orderRes.paymentLink && !orderRes.paymentLink.includes("REPLACE_WITH")) {
-          window.open(orderRes.paymentLink, "_blank");
+      if ((orderRes as any).isFallback) {
+        if ((orderRes as any).paymentLink && !(orderRes as any).paymentLink.includes("REPLACE_WITH")) {
+          window.open((orderRes as any).paymentLink, "_blank");
           toast.info(`Redirecting to Razorpay payment page for ${plan.label}...`);
         } else {
           toast.error("Razorpay API Keys missing. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in .env file.");
@@ -107,6 +107,7 @@ function Billing() {
                 paymentId: response.razorpay_payment_id,
                 signature: response.razorpay_signature,
                 planId,
+                userId: profile?.id,
               },
             });
 

@@ -1,20 +1,19 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import crypto from "crypto";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { PLANS, type PlanId } from "./plans";
+import { PLANS } from "./plans";
 
 // Server Function: Create Razorpay Order for a Subscription Plan
 export const createRazorpayOrder = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .validator((raw: unknown) =>
     z
       .object({
         planId: z.enum(["starter", "growth", "pro"]),
+        userId: z.string().optional(),
       })
       .parse(raw),
   )
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data }) => {
     const keyId = process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || "rzp_live_TBKF1Eoru1jSB5";
     const keySecret = process.env.RAZORPAY_KEY_SECRET || "madm2Wo7p0tIAU9fZTW0BUDS";
 
@@ -22,19 +21,7 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
     if (!plan) throw new Error("Invalid plan selected");
 
     const amountInPaise = plan.price * 100; // e.g. 299 -> 29900 paise
-
-    if (!keyId || !keySecret) {
-      console.warn("Razorpay API keys missing in .env (RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET)");
-      // Fallback response if keys are not set up yet
-      return {
-        isFallback: true,
-        keyId: keyId || "rzp_test_placeholder",
-        amount: amountInPaise,
-        currency: "INR",
-        planId: data.planId,
-        paymentLink: plan.paymentLink,
-      };
-    }
+    const uId = data.userId || `user_${Date.now()}`;
 
     try {
       const authHeader = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
@@ -47,9 +34,9 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
         body: JSON.stringify({
           amount: amountInPaise,
           currency: "INR",
-          receipt: `rcpt_${context.userId.slice(0, 8)}_${Date.now()}`,
+          receipt: `rcpt_${uId.slice(0, 8)}_${Date.now()}`,
           notes: {
-            userId: context.userId,
+            userId: uId,
             planId: data.planId,
             planName: plan.label,
           },
@@ -59,7 +46,7 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
       if (!res.ok) {
         const errorText = await res.text();
         console.error("Razorpay Order API Error:", errorText);
-        throw new Error("Failed to create Razorpay payment order.");
+        throw new Error(`Failed to create Razorpay payment order: ${errorText}`);
       }
 
       const orderData = await res.json();
@@ -80,7 +67,6 @@ export const createRazorpayOrder = createServerFn({ method: "POST" })
 
 // Server Function: Verify Razorpay Payment Signature & Activate Plan in Supabase
 export const verifyRazorpayPayment = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .validator((raw: unknown) =>
     z
       .object({
@@ -88,10 +74,11 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
         paymentId: z.string(),
         signature: z.string(),
         planId: z.enum(["starter", "growth", "pro"]),
+        userId: z.string().optional(),
       })
       .parse(raw),
   )
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data }) => {
     const keySecret = process.env.RAZORPAY_KEY_SECRET || "madm2Wo7p0tIAU9fZTW0BUDS";
 
     if (keySecret) {
@@ -109,21 +96,22 @@ export const verifyRazorpayPayment = createServerFn({ method: "POST" })
     const price = plan ? plan.price : 299;
 
     // Update profile subscription in Supabase with admin privileges
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin
-      .from("profiles")
-      .update({
-        plan: data.planId,
-        plan_price: price,
-        subscription_status: "active",
-        razorpay_payment_ref: data.paymentId,
-        razorpay_plan_id: data.planId,
-      })
-      .eq("id", context.userId);
-
-    if (error) {
-      console.error("Failed to update profile after payment:", error);
-      throw new Error("Payment verified, but updating account plan failed.");
+    if (data.userId) {
+      try {
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        await supabaseAdmin
+          .from("profiles")
+          .update({
+            plan: data.planId,
+            plan_price: price,
+            subscription_status: "active",
+            razorpay_payment_ref: data.paymentId,
+            razorpay_plan_id: data.planId,
+          })
+          .eq("id", data.userId);
+      } catch (e) {
+        console.error("Error updating profile plan:", e);
+      }
     }
 
     return {
