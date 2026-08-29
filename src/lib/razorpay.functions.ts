@@ -4,9 +4,11 @@ import crypto from "crypto";
 import { PLANS } from "./plans";
 
 function getRazorpayKeys() {
+  const keyId = process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || "";
+  const keySecret = process.env.RAZORPAY_KEY_SECRET || "";
   return {
-    keyId: "rzp_live_TVWj8KfdwUCtTh",
-    keySecret: "cisNPwOOpcOCbeBfpmQlcyWU",
+    keyId: keyId.trim(),
+    keySecret: keySecret.trim(),
   };
 }
 
