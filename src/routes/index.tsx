@@ -60,6 +60,26 @@ const TESTIMONIALS = [
 const luxuryEase = [0.16, 1, 0.3, 1] as const;
 
 function Landing() {
+  const nav = useNavigate();
+  const [userLoggedIn, setUserLoggedIn] = useState(false);
+
+  useEffect(() => {
+    // Catch access_token in hash fragment from Supabase auth redirects and forward to dashboard
+    if (typeof window !== "undefined" && window.location.hash.includes("access_token")) {
+      supabase.auth.getSession().then(({ data }) => {
+        if (data.session) {
+          nav({ to: "/dashboard" });
+        }
+      });
+    }
+
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) {
+        setUserLoggedIn(true);
+      }
+    });
+  }, [nav]);
+
   return (
     <div className="min-h-screen font-sans bg-[#FBFBFA] text-[#18181B] antialiased relative overflow-x-hidden">
       {/* 1. HEADER - EXACT LOVABLE APP */}
@@ -74,10 +94,10 @@ function Landing() {
               Free Demo
             </Link>
             <Link
-              to="/auth"
+              to={userLoggedIn ? "/dashboard" : "/auth"}
               className="px-5 py-2 rounded-full border border-black/15 bg-white text-[var(--ink)] font-semibold shadow-2xs hover:bg-zinc-50 transition cursor-pointer"
             >
-              Login
+              {userLoggedIn ? "Go to Dashboard" : "Login"}
             </Link>
           </div>
         </div>
@@ -104,19 +124,19 @@ function Landing() {
 
           <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3 max-w-md mx-auto">
             <Link
-              to="/auth"
+              to={userLoggedIn ? "/dashboard" : "/auth"}
               className="w-full sm:w-auto h-12 px-8 rounded-2xl bg-[#18181B] text-white font-bold text-xs uppercase tracking-wider shadow-lg hover:bg-black transition flex items-center justify-center gap-2 cursor-pointer"
             >
-              Start free trial <ArrowRight className="w-4 h-4" />
+              {userLoggedIn ? "Open Dashboard" : "Start free trial"} <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
 
           <div>
             <Link
-              to="/auth"
+              to={userLoggedIn ? "/dashboard" : "/auth"}
               className="inline-block px-5 py-2 rounded-xl bg-white border border-black/10 text-xs font-semibold text-[var(--ink-60)] hover:text-[#18181B] hover:bg-zinc-50 transition shadow-2xs cursor-pointer"
             >
-              Login to your dashboard
+              {userLoggedIn ? "Signed in as User — Go to Dashboard" : "Login to your dashboard"}
             </Link>
           </div>
 
