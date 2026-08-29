@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="favGoldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#FFFDF7" />
+      <stop offset="45%" stopColor="#C9952E" />
+      <stop offset="100%" stopColor="#A67920" />
+    </linearGradient>
+  </defs>
+
+  {/* Background Obsidian Tile */}
+  <rect width="64" height="64" rx="18" fill="#14110E" />
+  <rect x="2" y="2" width="60" height="60" rx="16" fill="none" stroke="url(#favGoldGrad)" stroke-width="2.5" opacity="0.8" />
+
+  {/* Golden Orbit Ring */}
+  <circle cx="32" cy="32" r="24" stroke="url(#favGoldGrad)" stroke-width="1.8" stroke-dasharray="4 3" opacity="0.7" />
+
+  {/* Outer Diamond Starburst */}
+  <path d="M32 9L36.2 24.8L52 29L36.2 33.2L32 49L27.8 33.2L12 29L27.8 24.8L32 9Z" fill="url(#favGoldGrad)" />
+
+  {/* Inner White Sparkle */}
+  <path d="M32 17L34.2 26.8L44 29L34.2 31.2L32 41L29.8 31.2L20 29L29.8 26.8L32 17Z" fill="#FFFDF7" opacity="0.95" />
+
+  {/* Center Core Dot */}
+  <circle cx="32" cy="29" r="3" fill="#14110E" />
+</svg>

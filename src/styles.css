@@ -1,0 +1,230 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@500;600;700;800;900&display=swap');
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Design system definition.
+ *
+ * The @theme inline block maps CSS custom properties to Tailwind utility
+ * classes (e.g. --color-primary -> bg-primary, text-primary).
+ *
+ * The :root and .dark blocks define the actual color values using oklch.
+ * All colors MUST use oklch format.
+ *
+ * To add a new semantic color:
+ * 1. Add the variable to :root (light value) and .dark (dark value)
+ * 2. Register it in @theme inline as --color-<name>: var(--<name>)
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+:root {
+  --font-sans: "Plus Jakarta Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Plus Jakarta Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+  --radius: 0.875rem;
+
+  /* IntellectFlow Bespoke Design Tokens */
+  --ink: #14110E;
+  --paper: #E6E4DF;
+  --clay: #E6E4DF;
+  --brass: #E85D04;
+  --brass-deep: #C74D00;
+  --orange-hero: #E85D04;
+  --routed-green: #1F6F4C;
+  --caught-coral: #D92338;
+  --cherry-red: #D92338;
+  --cherry-red-deep: #A31224;
+  --ink-60: rgba(20, 17, 14, 0.65);
+  --ink-10: rgba(20, 17, 14, 0.10);
+
+  --background: #E6E4DF;
+  --foreground: #14110E;
+  --card: #FFFFFF;
+  --card-foreground: #14110E;
+  --popover: #FFFFFF;
+  --popover-foreground: #14110E;
+  --primary: #14110E;
+  --primary-foreground: #F7F1E4;
+  --secondary: #EFE8D8;
+  --secondary-foreground: #14110E;
+  --muted: #EFE8D8;
+  --muted-foreground: rgba(20, 17, 14, 0.60);
+  --accent: #C9952E;
+  --accent-foreground: #14110E;
+  --destructive: #B34B3C;
+  --destructive-foreground: #FFFFFF;
+  --border: rgba(20, 17, 14, 0.12);
+  --input: rgba(20, 17, 14, 0.12);
+  --ring: #C9952E;
+  --sidebar: #F2EAD8;
+  --sidebar-foreground: #14110E;
+  --sidebar-primary: #14110E;
+  --sidebar-primary-foreground: #F7F1E4;
+  --sidebar-accent: #E8DECA;
+  --sidebar-accent-foreground: #14110E;
+  --sidebar-border: rgba(20, 17, 14, 0.10);
+  --sidebar-ring: #C9952E;
+}
+
+.dark {
+  --background: oklch(0.129 0.042 264.695);
+  --foreground: oklch(0.984 0.003 247.858);
+  --card: oklch(0.208 0.042 265.755);
+  --card-foreground: oklch(0.984 0.003 247.858);
+  --popover: oklch(0.208 0.042 265.755);
+  --popover-foreground: oklch(0.984 0.003 247.858);
+  --primary: oklch(0.929 0.013 255.508);
+  --primary-foreground: oklch(0.208 0.042 265.755);
+  --secondary: oklch(0.279 0.041 260.031);
+  --secondary-foreground: oklch(0.984 0.003 247.858);
+  --muted: oklch(0.279 0.041 260.031);
+  --muted-foreground: oklch(0.704 0.04 256.788);
+  --accent: oklch(0.279 0.041 260.031);
+  --accent-foreground: oklch(0.984 0.003 247.858);
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.984 0.003 247.858);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.551 0.027 264.364);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.208 0.042 265.755);
+  --sidebar-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-accent: oklch(0.279 0.041 260.031);
+  --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.551 0.027 264.364);
+}
+
+@theme inline {
+  --font-sans: var(--font-sans);
+  --font-display: var(--font-display);
+  --font-mono: var(--font-mono);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+}
+
+@utility text-gradient-brand {
+  background-image: linear-gradient(135deg, oklch(0.72 0.19 45), oklch(0.62 0.24 25));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@utility text-gradient-purple {
+  background-image: linear-gradient(135deg, oklch(0.5 0.24 295), oklch(0.55 0.22 275));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ---- Signature visual language: printed ticket-stub, like the QR standee itself ---- */
+
+@utility font-mono-brand {
+  font-family: var(--font-mono);
+}
+
+@utility eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* A card shaped like a torn ticket stub — used for testimonials, pricing, tool cards. */
+@utility ticket-card {
+  position: relative;
+  border-radius: 22px;
+  border: 1px solid oklch(0.19 0.012 260 / 10%);
+  background: var(--paper);
+}
+
+/* Perforated tear-line divider inside a ticket-card, with punched circle notches on both ends. */
+@utility ticket-tear {
+  position: relative;
+  height: 0;
+  margin: 0 0.25rem;
+  border-top: 2px dashed oklch(0.19 0.012 260 / 18%);
+}
+@utility ticket-tear-hole {
+  position: absolute;
+  top: -7px;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--background);
+}
+
+/* Faint dot-grid, evoking dot-matrix receipt printing — used sparingly behind hero content. */
+@utility dot-grid {
+  background-image: radial-gradient(oklch(0.19 0.012 260 / 14%) 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+
