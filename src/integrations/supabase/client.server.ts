@@ -29,19 +29,36 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
   };
 }
 
+function getValidAdminSupabaseUrl(): string {
+  const DEFAULT_URL = "https://ltvzksmbrfnzcycknbqj.supabase.co";
+  const candidates = [
+    typeof process !== "undefined" ? process.env['SUPABASE_URL'] : undefined,
+    typeof process !== "undefined" ? process.env['VITE_SUPABASE_URL'] : undefined,
+  ];
+  for (const c of candidates) {
+    if (c && typeof c === "string" && c.trim().startsWith("http")) {
+      return c.trim();
+    }
+  }
+  return DEFAULT_URL;
+}
+
+function getValidAdminSupabaseKey(): string {
+  const DEFAULT_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx0dnprc21icmZuemN5Y2tuYnFqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NzM2NDU5MiwiZXhwIjoyMTAyOTQwNTkyfQ.X_OrglyFwPLu4KxguJhIYj4AJI6H92E7psE1tSLe9TI";
+  const candidate = typeof process !== "undefined" ? process.env['SUPABASE_SERVICE_ROLE_KEY'] : undefined;
+  if (candidate && typeof candidate === "string" && candidate.trim().length > 10) {
+    return candidate.trim();
+  }
+  return DEFAULT_KEY;
+}
+
 function createSupabaseAdminClient() {
-  const SUPABASE_URL =
-    process.env['SUPABASE_URL'] ||
-    process.env['VITE_SUPABASE_URL'] ||
-    "https://ltvzksmbrfnzcycknbqj.supabase.co";
+  const url = getValidAdminSupabaseUrl();
+  const key = getValidAdminSupabaseKey();
 
-  const SUPABASE_SERVICE_ROLE_KEY =
-    process.env['SUPABASE_SERVICE_ROLE_KEY'] ||
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx0dnprc21icmZuemN5Y2tuYnFqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NzM2NDU5MiwiZXhwIjoyMTAyOTQwNTkyfQ.X_OrglyFwPLu4KxguJhIYj4AJI6H92E7psE1tSLe9TI";
-
-  return createClient<Database>(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+  return createClient<Database>(url, key, {
     global: {
-      fetch: createSupabaseFetch(SUPABASE_SERVICE_ROLE_KEY),
+      fetch: createSupabaseFetch(key),
     },
     auth: {
       storage: undefined,

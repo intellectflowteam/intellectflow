@@ -27,24 +27,43 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 }
 
 
+function getValidSupabaseUrl(): string {
+  const DEFAULT_URL = "https://ltvzksmbrfnzcycknbqj.supabase.co";
+  const candidates = [
+    import.meta.env['VITE_SUPABASE_URL'],
+    typeof process !== "undefined" ? process.env['VITE_SUPABASE_URL'] : undefined,
+    typeof process !== "undefined" ? process.env['SUPABASE_URL'] : undefined,
+  ];
+  for (const c of candidates) {
+    if (c && typeof c === "string" && c.trim().startsWith("http")) {
+      return c.trim();
+    }
+  }
+  return DEFAULT_URL;
+}
+
+function getValidSupabaseKey(): string {
+  const DEFAULT_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx0dnprc21icmZuemN5Y2tuYnFqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODczNjQ1OTIsImV4cCI6MjEwMjk0MDU5Mn0.RMp3S9gX2epAMn9sSb8rzFJOUzL4gKraJmXc9Qe-s-4";
+  const candidates = [
+    import.meta.env['VITE_SUPABASE_PUBLISHABLE_KEY'],
+    typeof process !== "undefined" ? process.env['VITE_SUPABASE_PUBLISHABLE_KEY'] : undefined,
+    typeof process !== "undefined" ? process.env['SUPABASE_PUBLISHABLE_KEY'] : undefined,
+  ];
+  for (const c of candidates) {
+    if (c && typeof c === "string" && c.trim().length > 10) {
+      return c.trim();
+    }
+  }
+  return DEFAULT_KEY;
+}
+
 function createSupabaseClient() {
-  // Use import.meta.env for client-side (Vite build-time replacement)
-  // Fall back to process.env or project defaults for SSR (server-side rendering)
-  const SUPABASE_URL =
-    import.meta.env['VITE_SUPABASE_URL'] ||
-    process.env['VITE_SUPABASE_URL'] ||
-    process.env['SUPABASE_URL'] ||
-    "https://ltvzksmbrfnzcycknbqj.supabase.co";
+  const url = getValidSupabaseUrl();
+  const key = getValidSupabaseKey();
 
-  const SUPABASE_PUBLISHABLE_KEY =
-    import.meta.env['VITE_SUPABASE_PUBLISHABLE_KEY'] ||
-    process.env['VITE_SUPABASE_PUBLISHABLE_KEY'] ||
-    process.env['SUPABASE_PUBLISHABLE_KEY'] ||
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx0dnprc21icmZuemN5Y2tuYnFqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODczNjQ1OTIsImV4cCI6MjEwMjk0MDU5Mn0.RMp3S9gX2epAMn9sSb8rzFJOUzL4gKraJmXc9Qe-s-4";
-
-  return createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+  return createClient<Database>(url, key, {
     global: {
-      fetch: createSupabaseFetch(SUPABASE_PUBLISHABLE_KEY),
+      fetch: createSupabaseFetch(key),
     },
     auth: {
       storage: typeof window !== 'undefined' ? localStorage : undefined,
