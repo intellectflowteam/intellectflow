@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
@@ -8,7 +8,8 @@ import { getMyBusiness } from "@/lib/queries";
 import { getPlaceDetails } from "@/lib/places.functions";
 import { aiReply } from "@/lib/ai.functions";
 import { parseBusinessMeta } from "@/lib/utils";
-import { Star, Loader2, RefreshCw, ExternalLink, Sparkles, Copy } from "lucide-react";
+import { PlaceSearchInput } from "@/components/PlaceSearchInput";
+import { Star, Loader2, RefreshCw, ExternalLink, Sparkles, Copy, MapPin } from "lucide-react";
 
 
 export const Route = createFileRoute("/_authenticated/reviews")({
@@ -26,6 +27,7 @@ export const Route = createFileRoute("/_authenticated/reviews")({
 });
 
 function Reviews() {
+  const queryClient = useQueryClient();
   const { data: biz } = useQuery({ queryKey: ["biz"], queryFn: getMyBusiness });
   const [tab, setTab] = useState<"google" | "collected">("google");
   const details = useServerFn(getPlaceDetails);
@@ -40,10 +42,26 @@ function Reviews() {
   const google = useQuery({
     queryKey: ["google-reviews", biz?.place_id, biz?.name, biz?.gmb_link],
     enabled: !!biz?.id,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0,
     retry: false,
     queryFn: async () => details({ data: { place_id: biz?.place_id || biz?.gmb_link || "place-custom-1", business_name: biz?.name } }),
   });
+
+  const handleConnectPlace = async (p: { place_id: string; name: string }) => {
+    if (!biz?.id) return;
+    const gmb_link = `https://search.google.com/local/writereview?placeid=${p.place_id}`;
+    const { error } = await supabase
+      .from("businesses")
+      .update({ place_id: p.place_id, name: p.name, gmb_link })
+      .eq("id", biz.id);
+    if (error) {
+      toast.error("Could not link business profile");
+    } else {
+      toast.success(`Connected to ${p.name}! Loading live Google reviews...`);
+      queryClient.invalidateQueries({ queryKey: ["biz"] });
+      queryClient.invalidateQueries({ queryKey: ["google-reviews"] });
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -102,18 +120,28 @@ function Reviews() {
               </div>
               <div className="divide-y divide-black/5">
                 {(google.data.reviews ?? []).length === 0 && (
-                  <div className="p-8 text-center space-y-3">
-                    <div className="text-sm font-bold text-zinc-800">No live Google Places API reviews returned.</div>
-                    <p className="text-xs text-zinc-500 max-w-md mx-auto leading-relaxed">
-                      To sync live Google Maps reviews, ensure <code className="bg-zinc-100 px-1 py-0.5 rounded text-black font-mono text-[11px]">GOOGLE_API_KEY</code> is set in Vercel Environment Variables. You can also view all customer reviews collected through your QR page under the <strong>COLLECTED</strong> tab.
-                    </p>
-                    <div className="pt-1 flex justify-center">
-                      <button
-                        onClick={() => setTab("collected")}
-                        className="px-3.5 py-2 rounded-lg bg-black text-white text-xs font-bold inline-flex items-center gap-1.5 hover:bg-zinc-800 transition"
-                      >
-                        View QR Collected Reviews ({(reviews ?? []).length})
-                      </button>
+                  <div className="p-6 text-center space-y-4 max-w-lg mx-auto py-8">
+                    <div className="w-12 h-12 rounded-2xl bg-yellow-100 text-yellow-700 grid place-items-center mx-auto text-xl font-bold">
+                      <MapPin className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-zinc-900">Connect Google Business Profile</h3>
+                      <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
+                        Type your business name below to link your official Google Maps profile and load live reviews:
+                      </p>
+                    </div>
+                    <div className="text-left">
+                      <PlaceSearchInput
+                        placeholder="Type business name (e.g. Khodiyar Dhaba, Intellect Flow)..."
+                        onSelectPlace={(p) => handleConnectPlace({ place_id: p.place_id, name: p.primary })}
+                      />
+                    </div>
+                    <div className="pt-2 text-xs text-zinc-500">
+                      Or view reviews collected via your QR code under the{" "}
+                      <button onClick={() => setTab("collected")} className="font-bold text-black underline">
+                        COLLECTED
+                      </button>{" "}
+                      tab ({(reviews ?? []).length}).
                     </div>
                   </div>
                 )}
