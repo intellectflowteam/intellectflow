@@ -285,14 +285,25 @@ function AiReplyBox({
   return (
     <div className="mt-3">
       {replies.length === 0 ? (
-        <button
-          onClick={handleGenerate}
-          disabled={busy}
-          className="h-8 px-3 rounded-lg bg-black text-white text-xs font-bold inline-flex items-center gap-1.5 disabled:opacity-60 hover:bg-zinc-800 transition"
-        >
-          {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 text-yellow-300" />}
-          Auto-Generate AI Reply
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={handleGenerate}
+            disabled={busy}
+            className="h-8 px-3 rounded-lg bg-black text-white text-xs font-bold inline-flex items-center gap-1.5 disabled:opacity-60 hover:bg-zinc-800 transition cursor-pointer"
+          >
+            {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 text-yellow-300" />}
+            Auto-Generate AI Reply
+          </button>
+          <button
+            onClick={() => {
+              const greeting = `Thank you so much ${review.author} ji for your wonderful review! We are delighted to serve you at ${businessName || "our business"}. Looking forward to seeing you again!`;
+              copyAndOpen(greeting);
+            }}
+            className="h-8 px-3 rounded-lg border border-black/15 bg-white text-zinc-800 text-xs font-bold inline-flex items-center gap-1.5 hover:bg-zinc-50 transition cursor-pointer"
+          >
+            Reply on Google Profile <ExternalLink className="w-3 h-3 text-blue-600" />
+          </button>
+        </div>
       ) : (
         <div className="rounded-xl border border-purple-200 bg-purple-50/60 p-3 space-y-2">
           <div className="flex items-center justify-between gap-2 mb-1">
