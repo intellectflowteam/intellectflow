@@ -102,7 +102,20 @@ function Reviews() {
               </div>
               <div className="divide-y divide-black/5">
                 {(google.data.reviews ?? []).length === 0 && (
-                  <div className="p-8 text-center text-sm text-zinc-500">No public Google reviews returned yet.</div>
+                  <div className="p-8 text-center space-y-3">
+                    <div className="text-sm font-bold text-zinc-800">No live Google Places API reviews returned.</div>
+                    <p className="text-xs text-zinc-500 max-w-md mx-auto leading-relaxed">
+                      To sync live Google Maps reviews, ensure <code className="bg-zinc-100 px-1 py-0.5 rounded text-black font-mono text-[11px]">GOOGLE_API_KEY</code> is set in Vercel Environment Variables. You can also view all customer reviews collected through your QR page under the <strong>COLLECTED</strong> tab.
+                    </p>
+                    <div className="pt-1 flex justify-center">
+                      <button
+                        onClick={() => setTab("collected")}
+                        className="px-3.5 py-2 rounded-lg bg-black text-white text-xs font-bold inline-flex items-center gap-1.5 hover:bg-zinc-800 transition"
+                      >
+                        View QR Collected Reviews ({(reviews ?? []).length})
+                      </button>
+                    </div>
+                  </div>
                 )}
                 {(google.data.reviews ?? []).map((r, i) => (
                   <div key={i} className="p-4 flex items-start gap-3">
