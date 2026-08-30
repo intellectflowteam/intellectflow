@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { aiWriter } from "@/lib/ai.functions";
 import { supabase } from "@/integrations/supabase/client";
+import { parseBusinessMeta, cleanDescription } from "@/lib/utils";
 import { Star, Check, Copy, Loader2, ExternalLink, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
@@ -106,12 +107,10 @@ function PublicReview() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiItems, setAiItems] = useState<Suggestion[] | null>(null);
 
-  const parsedKeywords = useMemo(() => {
-    const kwRaw = (biz as any)?.target_keywords;
-    return typeof kwRaw === "string"
-      ? kwRaw.split(",").map((s) => s.trim()).filter(Boolean)
-      : Array.isArray(kwRaw) ? kwRaw : [];
-  }, [biz]);
+  const meta = useMemo(() => parseBusinessMeta(biz), [biz]);
+  const parsedKeywords = meta.keywords;
+  const preferredLanguage = meta.preferredLanguage;
+  const cleanDesc = useMemo(() => cleanDescription(biz.description), [biz.description]);
 
   const fallback = useMemo(
     () => buildTemplates(bizName, biz.business_type ?? "shop", biz.city ?? "", parsedKeywords),
@@ -126,7 +125,6 @@ function PublicReview() {
 
   const fetchFreshAiReviews = (forceSeed?: number) => {
     setAiLoading(true);
-    const language = (biz as any)?.preferred_language || "English";
 
     writer({
       data: {
@@ -134,9 +132,9 @@ function PublicReview() {
         businessName: bizName,
         businessType: biz.business_type ?? "shop",
         businessCity: biz.city ?? undefined,
-        businessDescription: biz.description ?? undefined,
+        businessDescription: cleanDesc || undefined,
         targetKeywords: parsedKeywords,
-        language: (["English", "Hindi", "Gujarati", "Marathi"].includes(language) ? language : "English") as any,
+        language: (["English", "Hindi", "Gujarati", "Marathi"].includes(preferredLanguage) ? preferredLanguage : "English") as any,
         count: 5,
         seed: forceSeed || Math.floor(Math.random() * 100000),
       },

@@ -28,6 +28,7 @@ function Reviews() {
   const { data: biz } = useQuery({ queryKey: ["biz"], queryFn: getMyBusiness });
   const [tab, setTab] = useState<"google" | "collected">("google");
   const details = useServerFn(getPlaceDetails);
+  const meta = useMemo(() => parseBusinessMeta(biz), [biz]);
 
   const { data: reviews } = useQuery({
     queryKey: ["all-reviews", biz?.id],
@@ -120,8 +121,8 @@ function Reviews() {
                       <AiReplyBox
                         review={r}
                         businessName={biz?.name ?? undefined}
-                        targetKeywords={(biz as any)?.target_keywords ? (biz as any).target_keywords.split(",").map((s: string) => s.trim()).filter(Boolean) : []}
-                        preferredLanguage={(biz as any)?.preferred_language || "English"}
+                        targetKeywords={meta.keywords}
+                        preferredLanguage={meta.preferredLanguage}
                         mapsUri={google.data.google_maps_uri}
                       />
                     </div>

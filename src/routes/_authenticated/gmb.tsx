@@ -4,7 +4,8 @@ import { gmbPost } from "@/lib/ai.functions";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { getMyBusiness } from "@/lib/queries";
-import { useState } from "react";
+import { parseBusinessMeta } from "@/lib/utils";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   Loader2, Copy, Sparkles, Trash2, ExternalLink, Calendar,
@@ -29,13 +30,18 @@ function Gmb() {
   const [scheduleDate, setScheduleDate] = useState("");
   const [scheduleTime, setScheduleTime] = useState("10:00");
 
-  const kwRaw = (biz as any)?.target_keywords;
-  const initialKeywords = typeof kwRaw === "string"
-    ? kwRaw.split(",").map((s) => s.trim()).filter(Boolean)
-    : Array.isArray(kwRaw) ? kwRaw : [];
-  const [keywords, setKeywords] = useState<string[]>(initialKeywords);
-  const [kwInput, setKwInput] = useState(initialKeywords.join(", "));
-  const [lang, setLang] = useState<"English" | "Hindi" | "Gujarati" | "Marathi">((biz as any)?.preferred_language || "English");
+  const [keywords, setKeywords] = useState<string[]>([]);
+  const [kwInput, setKwInput] = useState("");
+  const [lang, setLang] = useState<"English" | "Hindi" | "Gujarati" | "Marathi">("English");
+
+  useEffect(() => {
+    if (biz) {
+      const meta = parseBusinessMeta(biz);
+      setKeywords(meta.keywords);
+      setKwInput(meta.keywords.join(", "));
+      setLang((["English", "Hindi", "Gujarati", "Marathi"].includes(meta.preferredLanguage) ? meta.preferredLanguage : "English") as any);
+    }
+  }, [biz]);
 
   const { data: posts } = useQuery({
     queryKey: ["gmb-posts", biz?.id], enabled: !!biz?.id,

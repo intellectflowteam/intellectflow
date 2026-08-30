@@ -158,52 +158,90 @@ export const getPlaceDetails = createServerFn({ method: "POST" })
     };
   });
 
-// Type-ahead suggestions while the user is typing (Places Autocomplete - New)
+// Type-ahead suggestions while the user is typing (Places Autocomplete - New with Text Search fallback)
 export const autocompletePlaces = createServerFn({ method: "POST" })
   .inputValidator((raw: unknown) =>
     z.object({ input: z.string().trim().min(2).max(200) }).parse(raw),
   )
   .handler(async ({ data }): Promise<{ suggestions: PlaceSuggestion[] }> => {
-    let res: Response;
+    const suggestions: PlaceSuggestion[] = [];
+
+    // 1. Try Google Places Autocomplete API
     try {
-      res = await fetch(`${BASE}/places:autocomplete`, {
+      const res = await fetch(`${BASE}/places:autocomplete`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Goog-Api-Key": key() },
         body: JSON.stringify({
           input: data.input,
           regionCode: "IN",
-          includedRegionCodes: ["in"],
         }),
       });
-    } catch {
-      throw new Error("Could not reach Google Places. Check your internet and try again.");
-    }
-    if (!res.ok) {
-      const body = await res.text();
-      console.error(`[places.autocomplete] ${res.status}: ${body}`);
-      if (res.status === 403) throw new Error("Google Places API key is not authorized. Enable 'Places API (New)' on the key.");
-      return { suggestions: [] };
-    }
-    const json = (await res.json()) as {
-      suggestions?: Array<{
-        placePrediction?: {
-          placeId?: string;
-          structuredFormat?: { mainText?: { text?: string }; secondaryText?: { text?: string } };
-          text?: { text?: string };
+      if (res.ok) {
+        const json = (await res.json()) as {
+          suggestions?: Array<{
+            placePrediction?: {
+              placeId?: string;
+              structuredFormat?: { mainText?: { text?: string }; secondaryText?: { text?: string } };
+              text?: { text?: string };
+            };
+          }>;
         };
-      }>;
-    };
-    return {
-      suggestions:
-        json.suggestions
-          ?.map((s) => s.placePrediction)
-          .filter((p): p is NonNullable<typeof p> => !!p?.placeId)
-          .map((p) => ({
-            place_id: p.placeId!,
-            primary: p.structuredFormat?.mainText?.text ?? p.text?.text ?? "",
-            secondary: p.structuredFormat?.secondaryText?.text ?? "",
-          })) ?? [],
-    };
+        const items =
+          json.suggestions
+            ?.map((s) => s.placePrediction)
+            .filter((p): p is NonNullable<typeof p> => !!p?.placeId)
+            .map((p) => ({
+              place_id: p.placeId!,
+              primary: p.structuredFormat?.mainText?.text ?? p.text?.text ?? "",
+              secondary: p.structuredFormat?.secondaryText?.text ?? "",
+            })) ?? [];
+        suggestions.push(...items);
+      } else {
+        const errText = await res.text();
+        console.warn(`[places.autocomplete] HTTP ${res.status}: ${errText}`);
+      }
+    } catch (err) {
+      console.warn("[places.autocomplete] error:", err);
+    }
+
+    // 2. Fallback / supplement with Google Places Text Search if autocomplete gives fewer than 3 results
+    if (suggestions.length < 3) {
+      try {
+        const textRes = await fetch(`${BASE}/places:searchText`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Goog-Api-Key": key(),
+            "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress",
+          },
+          body: JSON.stringify({ textQuery: data.input, regionCode: "IN" }),
+        });
+        if (textRes.ok) {
+          const textJson = (await textRes.json()) as {
+            places?: Array<{
+              id: string;
+              displayName?: { text?: string };
+              formattedAddress?: string;
+            }>;
+          };
+          const existingIds = new Set(suggestions.map((s) => s.place_id));
+          for (const p of textJson.places ?? []) {
+            if (p.id && !existingIds.has(p.id)) {
+              suggestions.push({
+                place_id: p.id,
+                primary: p.displayName?.text ?? "",
+                secondary: p.formattedAddress ?? "",
+              });
+              existingIds.add(p.id);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("[places.searchText] fallback error:", err);
+      }
+    }
+
+    return { suggestions };
   });
 
 function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number) {

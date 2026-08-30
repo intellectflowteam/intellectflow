@@ -5,23 +5,9 @@ import { getMyBusiness, getMyProfile } from "@/lib/queries";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Plus, X, Edit2, Check, Sparkles, TrendingUp, Search, Award, RefreshCw } from "lucide-react";
+import { parseBusinessMeta, cleanDescription, formatDescriptionWithMeta, estimateKeywordRank } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/settings")({ component: Settings });
-
-// Deterministic / Live Google Rank estimation simulation helper based on keyword & business name
-function estimateKeywordRank(keyword: string, bizName: string, city: string) {
-  const hash = (keyword + bizName + city).split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const pos = (hash % 5) + 1; // Rank #1 to #5
-  const isLocalPack = pos <= 3;
-  const searchVolume = 250 + (hash % 1200);
-  return {
-    rank: pos,
-    isLocalPack,
-    searchVolume,
-    status: pos === 1 ? "#1 Top Rank" : pos <= 3 ? "Google Local Pack" : "Top 5 Result",
-    badgeColor: pos === 1 ? "bg-emerald-500 text-white" : pos <= 3 ? "bg-amber-500 text-white" : "bg-blue-600 text-white",
-  };
-}
 
 function Settings() {
   const { data: biz } = useQuery({ queryKey: ["biz"], queryFn: getMyBusiness });
@@ -48,25 +34,18 @@ function Settings() {
 
   useEffect(() => {
     if (biz) {
+      const meta = parseBusinessMeta(biz);
       setForm({
         name: biz.name ?? "",
         phone: (biz as any).phone ?? profile?.phone ?? "",
         city: biz.city ?? "",
         gmb_link: biz.gmb_link ?? "",
         address: biz.address ?? "",
-        description: (biz as any).description ?? "",
+        description: cleanDescription((biz as any).description),
         website: (biz as any).website ?? "",
-        preferred_language: (biz as any).preferred_language ?? "English",
+        preferred_language: meta.preferredLanguage || "English",
       });
-
-      const rawKw = (biz as any).target_keywords;
-      if (typeof rawKw === "string" && rawKw.trim()) {
-        setKeywords(rawKw.split(",").map((k: string) => k.trim()).filter(Boolean));
-      } else if (Array.isArray(rawKw)) {
-        setKeywords(rawKw.map((k) => String(k).trim()).filter(Boolean));
-      } else {
-        setKeywords(["best quality", "fast service", "top rated"]);
-      }
+      setKeywords(meta.keywords);
     }
   }, [biz, profile]);
 
@@ -112,7 +91,9 @@ function Settings() {
     setBusy(true);
     try {
       const kwString = keywords.join(", ");
-      await supabase
+      const formattedDesc = formatDescriptionWithMeta(form.description, keywords, form.preferred_language);
+
+      const { error: primaryErr } = await supabase
         .from("businesses")
         .update({
           name: form.name,
@@ -120,12 +101,30 @@ function Settings() {
           gmb_link: form.gmb_link,
           address: form.address,
           phone: form.phone,
-          description: form.description,
+          description: formattedDesc,
           website: form.website,
           target_keywords: kwString,
           preferred_language: form.preferred_language,
         } as any)
         .eq("id", biz.id);
+
+      if (primaryErr && primaryErr.code === "PGRST204") {
+        const { error: fallbackErr } = await supabase
+          .from("businesses")
+          .update({
+            name: form.name,
+            city: form.city,
+            gmb_link: form.gmb_link,
+            address: form.address,
+            phone: form.phone,
+            description: formattedDesc,
+            website: form.website,
+          } as any)
+          .eq("id", biz.id);
+        if (fallbackErr) throw fallbackErr;
+      } else if (primaryErr) {
+        throw primaryErr;
+      }
 
       if (profile) {
         await supabase
@@ -137,6 +136,7 @@ function Settings() {
       qc.invalidateQueries();
       toast.success("Preferences & Keywords saved successfully!");
     } catch (e) {
+      console.error("[settings.save]:", e);
       toast.error(e instanceof Error ? e.message : "Failed to save settings");
     } finally {
       setBusy(false);
@@ -206,7 +206,14 @@ function Settings() {
           ) : (
             <div className="flex flex-wrap gap-2.5 pt-1">
               {keywords.map((kw, index) => {
-                const rankData = estimateKeywordRank(kw, form.name || "Business", form.city || "Rajkot");
+                const rankData = estimateKeywordRank(
+                  kw,
+                  form.name || "Business",
+                  form.city || "Rajkot",
+                  biz?.rating ?? 4.8,
+                  biz?.total_reviews ?? 25,
+                  biz?.business_type ?? "shop"
+                );
                 const isEditing = editingIndex === index;
 
                 return (
@@ -284,7 +291,14 @@ function Settings() {
                 </thead>
                 <tbody className="divide-y divide-black/5">
                   {keywords.map((kw, i) => {
-                    const r = estimateKeywordRank(kw, form.name || "Business", form.city || "Rajkot");
+                    const r = estimateKeywordRank(
+                      kw,
+                      form.name || "Business",
+                      form.city || "Rajkot",
+                      biz?.rating ?? 4.8,
+                      biz?.total_reviews ?? 25,
+                      biz?.business_type ?? "shop"
+                    );
                     return (
                       <tr key={i} className="hover:bg-white transition">
                         <td className="p-3 font-bold text-zinc-900">{kw}</td>
