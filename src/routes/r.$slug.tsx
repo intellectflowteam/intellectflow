@@ -10,38 +10,47 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/r/$slug")({
   ssr: false,
   loader: async ({ params }) => {
-    const cleanSlug = (params.slug || "").trim().toLowerCase();
+    const rawSlug = params.slug || "";
+    const cleanSlug = rawSlug.trim().toLowerCase();
+    const normSlug = cleanSlug.replace(/[^a-z0-9]/g, "");
 
-    // 1. Exact match (case insensitive)
+    // 1. Exact match (case-insensitive)
     let { data } = await supabase
       .from("businesses_public")
       .select("*")
       .ilike("slug", cleanSlug)
       .maybeSingle();
 
-    // 2. Multi-tier smart fallback for all businesses so links never break
+    // 2. Substring & Prefix fallback matching
     if (!data && cleanSlug) {
       const parts = cleanSlug.split("-").filter(Boolean);
 
-      // Try 3-word prefix
-      if (!data && parts.length >= 3) {
-        const p3 = parts.slice(0, 3).join("-");
-        const res = await supabase.from("businesses_public").select("*").ilike("slug", `${p3}%`).limit(1).maybeSingle();
-        if (res.data) data = res.data;
+      for (const p of parts) {
+        if (p.length >= 3 && !data) {
+          const res = await supabase
+            .from("businesses_public")
+            .select("*")
+            .ilike("slug", `%${p}%`)
+            .limit(1)
+            .maybeSingle();
+          if (res.data) data = res.data;
+        }
       }
+    }
 
-      // Try 2-word prefix
-      if (!data && parts.length >= 2) {
-        const p2 = parts.slice(0, 2).join("-");
-        const res = await supabase.from("businesses_public").select("*").ilike("slug", `${p2}%`).limit(1).maybeSingle();
-        if (res.data) data = res.data;
-      }
-
-      // Try 1-word prefix
-      if (!data && parts.length >= 1 && parts[0].length >= 3) {
-        const p1 = parts[0];
-        const res = await supabase.from("businesses_public").select("*").ilike("slug", `${p1}%`).limit(1).maybeSingle();
-        if (res.data) data = res.data;
+    // 3. Normalized matching (ignores hyphens, spaces, special chars)
+    if (!data && normSlug) {
+      const { data: allBiz } = await supabase.from("businesses_public").select("*");
+      if (allBiz && allBiz.length > 0) {
+        const match = allBiz.find((b) => {
+          const bNorm = (b.slug || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+          return bNorm.includes(normSlug) || normSlug.includes(bNorm);
+        });
+        if (match) data = match;
+        // If demo/test URL or single business in DB, use first business
+        else if (cleanSlug === "demo" || cleanSlug === "default" || cleanSlug === "test" || allBiz.length === 1) {
+          data = allBiz[0];
+        }
       }
     }
 
@@ -62,9 +71,25 @@ export const Route = createFileRoute("/r/$slug")({
   }),
   notFoundComponent: () => (
     <div className="min-h-screen grid place-items-center px-4" style={{ backgroundColor: "#fdf6ef" }}>
-      <div className="text-center">
-        <h1 className="font-black text-3xl">Business not found</h1>
-        <p className="text-sm text-zinc-500 mt-2">Check the QR code or link.</p>
+      <div className="max-w-md w-full text-center bg-white rounded-2xl border border-black/10 shadow-sm p-6">
+        <h1 className="font-black text-2xl text-zinc-900">Business not found</h1>
+        <p className="text-sm text-zinc-500 mt-2">
+          The review page for this QR link doesn't exist or hasn't been created in the database yet.
+        </p>
+        <div className="mt-5 space-y-2">
+          <a
+            href="/r/intellect-flow"
+            className="block w-full py-2.5 px-4 rounded-xl bg-black text-white text-xs font-bold transition hover:bg-zinc-800"
+          >
+            Open Demo Review Page (/r/intellect-flow)
+          </a>
+          <a
+            href="/dashboard"
+            className="block w-full py-2.5 px-4 rounded-xl border border-black/15 text-xs font-semibold text-zinc-700 hover:bg-zinc-50"
+          >
+            Go to Owner Dashboard
+          </a>
+        </div>
       </div>
     </div>
   ),
