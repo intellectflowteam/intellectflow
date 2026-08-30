@@ -38,6 +38,7 @@ export type PlaceDetails = {
   latitude?: number;
   longitude?: number;
   reviews?: { author: string; rating: number; text: string; time: string }[];
+  isLiveGoogle?: boolean;
 };
 
 export type NearbyCompetitor = {
@@ -149,6 +150,7 @@ export const getPlaceDetails = createServerFn({ method: "POST" })
             latitude: p.location?.latitude,
             longitude: p.location?.longitude,
             reviews: reviewsList,
+            isLiveGoogle: true,
           };
         }
       } catch {
@@ -156,8 +158,7 @@ export const getPlaceDetails = createServerFn({ method: "POST" })
       }
     }
 
-    // Fallback response if API key is missing/unauthorized or fetch fails,
-    // ensuring the UI never gets stuck infinitely on "Loading live Google reviews..."
+    // Fallback response if API key is missing/unauthorized or fetch fails
     let fallbackName = "Your Business";
     if (data.place_id.includes("place-custom-")) {
       const raw = data.place_id.substring(data.place_id.lastIndexOf("-") + 1);
@@ -173,14 +174,11 @@ export const getPlaceDetails = createServerFn({ method: "POST" })
       place_id: data.place_id,
       name: fallbackName,
       address: "Gujarat, India",
-      rating: 4.8,
-      user_rating_count: 24,
+      rating: undefined,
+      user_rating_count: undefined,
       google_maps_uri: `https://search.google.com/local/writereview?placeid=${data.place_id}`,
-      reviews: [
-        { author: "Ramesh Patel", rating: 5, text: "Excellent product quality and very prompt customer support! Highly recommended.", time: new Date(Date.now() - 86400000 * 2).toISOString() },
-        { author: "Priya Sharma", rating: 5, text: "Super fast service and very friendly behavior by staff. 5 stars experience!", time: new Date(Date.now() - 86400000 * 5).toISOString() },
-        { author: "Amit Verma", rating: 5, text: "Great value for money. Best service in town!", time: new Date(Date.now() - 86400000 * 9).toISOString() },
-      ],
+      reviews: [],
+      isLiveGoogle: false,
     };
   });
 
