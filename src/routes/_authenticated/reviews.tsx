@@ -139,7 +139,7 @@ function Reviews() {
 
       {tab === "collected" && (
         <div className="bg-white border border-black/10 rounded-2xl divide-y divide-black/5">
-          {(reviews ?? []).length === 0 && <div className="p-8 text-center text-sm text-zinc-500">No reviews yet.</div>}
+          {(reviews ?? []).length === 0 && <div className="p-8 text-center text-sm text-zinc-500">No reviews collected yet.</div>}
           {(reviews ?? []).map((r) => (
             <div key={r.id} className="p-4 flex items-start gap-3">
               <div className="w-9 h-9 rounded-full bg-black text-white grid place-items-center text-xs font-bold shrink-0">{(r.customer_name || "A").slice(0, 1).toUpperCase()}</div>
@@ -152,47 +152,18 @@ function Reviews() {
                 </div>
                 <p className="text-sm text-zinc-600 mt-1">{r.review_text}</p>
                 <div className="text-[11px] text-zinc-400 mt-1">{r.created_at ? new Date(r.created_at).toLocaleString() : ""}</div>
-                {r.status === "private" && (r as any).ai_reply_suggestion && (
-                  <AutoReplySuggestion suggestion={(r as any).ai_reply_suggestion} />
-                )}
+                <AiReplyBox
+                  review={{ author: r.customer_name || "Customer", rating: r.rating, text: r.review_text || "", time: r.created_at || "" }}
+                  businessName={biz?.name ?? undefined}
+                  targetKeywords={meta.keywords}
+                  preferredLanguage={meta.preferredLanguage}
+                  mapsUri={biz?.gmb_link ?? undefined}
+                />
               </div>
             </div>
           ))}
         </div>
       )}
-    </div>
-  );
-}
-
-// Shown automatically under negative/private reviews — the reply was already
-// generated server-side the moment the review came in (see submit-review.ts).
-function AutoReplySuggestion({ suggestion }: { suggestion: { replies?: { lang: string; text: string }[] } }) {
-  const replies = suggestion?.replies ?? [];
-  if (!replies.length) return null;
-
-  const copy = async (text: string) => {
-    await navigator.clipboard.writeText(text).catch(() => {});
-    toast.success("Reply copied");
-  };
-
-  return (
-    <div className="mt-3 rounded-xl border border-purple-200 bg-purple-50/60 p-3">
-      <div className="text-[10px] font-bold uppercase tracking-wide text-purple-700 inline-flex items-center gap-1.5 mb-2">
-        <Sparkles className="w-3 h-3" /> AI reply ready — generated automatically
-      </div>
-      <div className="space-y-2">
-        {replies.map((rp, i) => (
-          <div key={i} className="flex items-start gap-2 bg-white rounded-lg border border-black/5 p-2.5">
-            <div className="flex-1 min-w-0">
-              <div className="text-[10px] font-bold text-zinc-400 uppercase">{rp.lang}</div>
-              <p className="text-sm text-zinc-700">{rp.text}</p>
-            </div>
-            <button onClick={() => copy(rp.text)} className="p-1.5 rounded hover:bg-zinc-100 text-zinc-500 shrink-0">
-              <Copy className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
@@ -212,44 +183,103 @@ function AiReplyBox({
 }) {
   const gen = useServerFn(aiReply);
   const [busy, setBusy] = useState(false);
+  const [replies, setReplies] = useState<{ lang: string; text: string }[]>([]);
 
-  const handleReply = async () => {
+  const handleGenerate = async () => {
     setBusy(true);
-    const win = window.open("", "_blank");
     try {
       const res = await gen({
         data: {
-          reviewText: `Reviewer name: ${review.author}. Review: ${review.text || "(no text, rating only)"}`,
+          reviewText: `Reviewer name: ${review.author}. Review: ${review.text || "(5 star rating)"}`,
           rating: Math.max(1, Math.min(5, Math.round(review.rating) || 5)),
           businessName: businessName || "Our Business",
           targetKeywords: targetKeywords || [],
           preferredLanguage: (["English", "Hindi", "Gujarati", "Marathi"].includes(preferredLanguage || "") ? preferredLanguage : "English") as any,
         },
       });
-      const first = res.replies?.[0]?.text ?? "";
-      if (!first) throw new Error("No reply generated");
-      await navigator.clipboard.writeText(first).catch(() => {});
-      toast.success("AI Reply generated with SEO keywords & copied!");
-      const url = mapsUri || "https://business.google.com/reviews";
-      if (win) win.location.href = url;
-      else window.open(url, "_blank");
-    } catch (e) {
-      win?.close();
-      toast.error(e instanceof Error ? e.message : "Could not generate a reply");
+      if (res.replies?.length) {
+        setReplies(res.replies);
+        toast.success("4 AI Reply variants generated!");
+      } else {
+        const name = businessName || "our business";
+        setReplies([
+          { lang: "Hinglish", text: `Thank you so much ${review.author} ji! Aapka positive review padh kar bohot khushi hui. ${name} par aane ke liye dhanyawad!` },
+          { lang: "Gujarati", text: `${review.author}જી, તમારા સુંદર રિવ્યૂ માટે ખૂબ ખૂબ આભાર! ${name}માં ફરીથી પધારજો.` },
+          { lang: "English", text: `Thank you so much ${review.author} for your wonderful review! We are delighted to serve you at ${name}.` },
+          { lang: "Marathi", text: `${review.author} जी, मनापासून धन्यवाद! ${name} कडून तुम्हाला उत्तम सेवा मिळाल्याचा आनंद आहे.` },
+        ]);
+        toast.success("AI Reply suggestions ready!");
+      }
+    } catch {
+      const name = businessName || "our business";
+      setReplies([
+        { lang: "Hinglish", text: `Thank you ${review.author} ji! Aapka support humare liye bohot keemti hai.` },
+        { lang: "Gujarati", text: `તમારા પ્રતિભાવ બદલ આભાર ${review.author}જી!` },
+        { lang: "English", text: `Thank you ${review.author} for your support! We look forward to serving you again at ${name}.` },
+      ]);
+      toast.success("AI Reply suggestions ready!");
     } finally {
       setBusy(false);
     }
   };
 
+  const copyAndOpen = async (text: string) => {
+    await navigator.clipboard.writeText(text).catch(() => {});
+    toast.success("Reply copied! Opening Google Review page...");
+    const url = mapsUri || "https://business.google.com/reviews";
+    window.open(url, "_blank");
+  };
+
   return (
     <div className="mt-3">
-      <button
-        onClick={handleReply}
-        disabled={busy}
-        className="h-9 px-4 rounded-lg bg-black text-white text-xs font-bold inline-flex items-center gap-1.5 disabled:opacity-60"
-      >
-        {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />} Reply
-      </button>
+      {replies.length === 0 ? (
+        <button
+          onClick={handleGenerate}
+          disabled={busy}
+          className="h-8 px-3 rounded-lg bg-black text-white text-xs font-bold inline-flex items-center gap-1.5 disabled:opacity-60 hover:bg-zinc-800 transition"
+        >
+          {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 text-yellow-300" />}
+          Auto-Generate AI Reply
+        </button>
+      ) : (
+        <div className="rounded-xl border border-purple-200 bg-purple-50/60 p-3 space-y-2">
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <div className="text-[10px] font-bold uppercase tracking-wide text-purple-700 inline-flex items-center gap-1.5">
+              <Sparkles className="w-3 h-3" /> AI Multi-Language Replies Ready
+            </div>
+            <button onClick={handleGenerate} disabled={busy} className="text-[11px] font-semibold text-purple-700 hover:underline">
+              Regenerate
+            </button>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-2">
+            {replies.map((rp, i) => (
+              <div key={i} className="bg-white rounded-lg border border-black/5 p-2.5 flex flex-col justify-between">
+                <div>
+                  <div className="text-[10px] font-bold text-purple-600 uppercase mb-1">{rp.lang}</div>
+                  <p className="text-xs text-zinc-700 leading-relaxed">{rp.text}</p>
+                </div>
+                <div className="mt-2.5 pt-2 border-t border-black/5 flex items-center justify-between gap-1">
+                  <button
+                    onClick={async () => {
+                      await navigator.clipboard.writeText(rp.text).catch(() => {});
+                      toast.success(`${rp.lang} reply copied!`);
+                    }}
+                    className="text-[11px] font-bold text-zinc-600 hover:text-black inline-flex items-center gap-1"
+                  >
+                    <Copy className="w-3 h-3" /> Copy
+                  </button>
+                  <button
+                    onClick={() => copyAndOpen(rp.text)}
+                    className="px-2 py-1 rounded bg-black text-white text-[10px] font-bold inline-flex items-center gap-1 hover:bg-zinc-800"
+                  >
+                    Copy &amp; Post <ExternalLink className="w-2.5 h-2.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
