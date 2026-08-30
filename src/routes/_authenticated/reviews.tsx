@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
@@ -8,8 +8,7 @@ import { getMyBusiness } from "@/lib/queries";
 import { getPlaceDetails } from "@/lib/places.functions";
 import { aiReply } from "@/lib/ai.functions";
 import { parseBusinessMeta } from "@/lib/utils";
-import { PlaceSearchInput } from "@/components/PlaceSearchInput";
-import { Star, Loader2, RefreshCw, ExternalLink, Sparkles, Copy, MapPin } from "lucide-react";
+import { Star, Loader2, RefreshCw, ExternalLink, Sparkles, Copy } from "lucide-react";
 
 
 export const Route = createFileRoute("/_authenticated/reviews")({
@@ -27,7 +26,6 @@ export const Route = createFileRoute("/_authenticated/reviews")({
 });
 
 function Reviews() {
-  const queryClient = useQueryClient();
   const { data: biz } = useQuery({ queryKey: ["biz"], queryFn: getMyBusiness });
   const [tab, setTab] = useState<"google" | "collected">("google");
   const details = useServerFn(getPlaceDetails);
@@ -39,29 +37,26 @@ function Reviews() {
     queryFn: async () => (await supabase.from("reviews").select("*").eq("business_id", biz!.id).order("created_at", { ascending: false })).data ?? [],
   });
 
+  const targetPlaceId = useMemo(() => {
+    if (biz?.gmb_link) {
+      const match = biz.gmb_link.match(/placeid=([a-zA-Z0-9_-]+)/i) || biz.gmb_link.match(/place_id=([a-zA-Z0-9_-]+)/i);
+      if (match?.[1] && !match[1].startsWith("place-custom-")) {
+        return match[1];
+      }
+    }
+    if (biz?.place_id && !biz.place_id.startsWith("place-custom-")) {
+      return biz.place_id;
+    }
+    return biz?.gmb_link || biz?.place_id || "place-custom-1";
+  }, [biz?.place_id, biz?.gmb_link]);
+
   const google = useQuery({
-    queryKey: ["google-reviews", biz?.place_id, biz?.name, biz?.gmb_link],
+    queryKey: ["google-reviews", targetPlaceId, biz?.name],
     enabled: !!biz?.id,
     staleTime: 0,
     retry: false,
-    queryFn: async () => details({ data: { place_id: biz?.place_id || biz?.gmb_link || "place-custom-1", business_name: biz?.name } }),
+    queryFn: async () => details({ data: { place_id: targetPlaceId, business_name: biz?.name } }),
   });
-
-  const handleConnectPlace = async (p: { place_id: string; name: string }) => {
-    if (!biz?.id) return;
-    const gmb_link = `https://search.google.com/local/writereview?placeid=${p.place_id}`;
-    const { error } = await supabase
-      .from("businesses")
-      .update({ place_id: p.place_id, name: p.name, gmb_link })
-      .eq("id", biz.id);
-    if (error) {
-      toast.error("Could not link business profile");
-    } else {
-      toast.success(`Connected to ${p.name}! Loading live Google reviews...`);
-      queryClient.invalidateQueries({ queryKey: ["biz"] });
-      queryClient.invalidateQueries({ queryKey: ["google-reviews"] });
-    }
-  };
 
   return (
     <div className="space-y-4">
@@ -70,38 +65,33 @@ function Reviews() {
           <h1 className="font-black text-2xl">Reviews</h1>
           <p className="text-sm text-zinc-500">Live from your Google profile, plus everything collected through your QR page.</p>
         </div>
-        {tab === "google" && biz?.place_id && (
+        {tab === "google" && (
           <button onClick={() => google.refetch()} className="h-9 px-3 rounded-lg border border-black/15 bg-white text-sm font-semibold inline-flex items-center gap-1.5">
             <RefreshCw className={"w-4 h-4 " + (google.isFetching ? "animate-spin" : "")} /> Refresh Reviews
           </button>
         )}
       </div>
 
-      <div className="flex gap-1">
-        {(["google", "collected"] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={[
-              "px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide",
-              tab === t ? "bg-black text-white" : "text-zinc-600 hover:bg-zinc-100",
-            ].join(" ")}
-          >
-            {t === "google" ? "Live Google reviews" : "Collected"}
-          </button>
-        ))}
+      <div className="flex items-center gap-2 border-b border-black/10 pb-3">
+        <button
+          onClick={() => setTab("google")}
+          className={"h-8 px-3 rounded-full text-xs font-bold transition " + (tab === "google" ? "bg-black text-white" : "bg-black/5 text-zinc-600 hover:bg-black/10")}
+        >
+          LIVE GOOGLE REVIEWS
+        </button>
+        <button
+          onClick={() => setTab("collected")}
+          className={"h-8 px-3 rounded-full text-xs font-bold transition " + (tab === "collected" ? "bg-black text-white" : "bg-black/5 text-zinc-600 hover:bg-black/10")}
+        >
+          COLLECTED ({(reviews ?? []).length})
+        </button>
       </div>
 
       {tab === "google" && (
         <div className="bg-white border border-black/10 rounded-2xl">
-          {!biz?.place_id && (
-            <div className="p-8 text-center text-sm text-zinc-500">
-              Connect your Google business profile in Settings to see live Google reviews here.
-            </div>
-          )}
-          {biz?.place_id && google.isLoading && (
+          {google.isLoading && (
             <div className="p-8 text-center text-sm text-zinc-500 inline-flex items-center gap-2 justify-center w-full">
-              <Loader2 className="w-4 h-4 animate-spin" /> Loading live Google reviews…
+              <Loader2 className="w-4 h-4 animate-spin" /> Loading live Google reviews for {biz?.name || "your business"}…
             </div>
           )}
           {google.isError && <div className="p-8 text-center text-sm text-red-600">Could not load Google reviews right now.</div>}
@@ -111,7 +101,7 @@ function Reviews() {
                 <div className="inline-flex items-center gap-1.5 font-black text-lg">
                   <Star className="w-4 h-4 fill-[#c9a227] text-[#c9a227]" /> {google.data.rating?.toFixed(1) ?? "—"}
                 </div>
-                <div className="text-sm text-zinc-500">{google.data.user_rating_count ?? 0} Google reviews</div>
+                <div className="text-sm text-zinc-500">{google.data.user_rating_count ?? 0} Google reviews ({google.data.name || biz?.name})</div>
                 {google.data.google_maps_uri && (
                   <a href={google.data.google_maps_uri} target="_blank" rel="noreferrer" className="ml-auto text-xs font-semibold text-blue-600 inline-flex items-center gap-1">
                     <ExternalLink className="w-3 h-3" /> Open on Google
@@ -120,29 +110,11 @@ function Reviews() {
               </div>
               <div className="divide-y divide-black/5">
                 {(google.data.reviews ?? []).length === 0 && (
-                  <div className="p-6 text-center space-y-4 max-w-lg mx-auto py-8">
-                    <div className="w-12 h-12 rounded-2xl bg-yellow-100 text-yellow-700 grid place-items-center mx-auto text-xl font-bold">
-                      <MapPin className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <h3 className="text-base font-bold text-zinc-900">Connect Google Business Profile</h3>
-                      <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
-                        Type your business name below to link your official Google Maps profile and load live reviews:
-                      </p>
-                    </div>
-                    <div className="text-left">
-                      <PlaceSearchInput
-                        placeholder="Type business name (e.g. Khodiyar Dhaba, Intellect Flow)..."
-                        onSelectPlace={(p) => handleConnectPlace({ place_id: p.place_id, name: p.primary })}
-                      />
-                    </div>
-                    <div className="pt-2 text-xs text-zinc-500">
-                      Or view reviews collected via your QR code under the{" "}
-                      <button onClick={() => setTab("collected")} className="font-bold text-black underline">
-                        COLLECTED
-                      </button>{" "}
-                      tab ({(reviews ?? []).length}).
-                    </div>
+                  <div className="p-8 text-center space-y-2">
+                    <div className="text-sm font-bold text-zinc-800">No public Google reviews returned yet.</div>
+                    <p className="text-xs text-zinc-500 max-w-md mx-auto">
+                      Check your <strong>COLLECTED</strong> tab to view reviews submitted directly by customers through your QR code ({(reviews ?? []).length}).
+                    </p>
                   </div>
                 )}
                 {(google.data.reviews ?? []).map((r, i) => (
