@@ -106,60 +106,121 @@ export const searchPlaces = createServerFn({ method: "POST" })
 
 export const getPlaceDetails = createServerFn({ method: "POST" })
   .inputValidator((raw: unknown) =>
-    z.object({ place_id: z.string().min(1).max(200) }).parse(raw),
+    z.object({ place_id: z.string().min(1).max(500), business_name: z.string().optional() }).parse(raw),
   )
   .handler(async ({ data }): Promise<PlaceDetails> => {
     const apiKey = key();
+    let targetPlaceId = data.place_id;
+
+    if (targetPlaceId.includes("placeid=")) {
+      const match = targetPlaceId.match(/placeid=([a-zA-Z0-9_-]+)/);
+      if (match?.[1]) targetPlaceId = match[1];
+    }
+
     if (apiKey) {
-      try {
-        const res = await fetch(`${BASE}/places/${encodeURIComponent(data.place_id)}`, {
-          headers: {
-            "X-Goog-Api-Key": apiKey,
-            "X-Goog-FieldMask":
-              "id,displayName,formattedAddress,internationalPhoneNumber,nationalPhoneNumber,websiteUri,rating,userRatingCount,googleMapsUri,addressComponents,photos,primaryTypeDisplayName,reviews,location",
-          },
-        });
-        if (res.ok) {
-          const p = (await res.json()) as any;
-          const city =
-            p.addressComponents?.find((c: any) =>
-              c.types?.some((t: string) => t === "locality" || t === "administrative_area_level_2"),
-            )?.longText ?? undefined;
+      if (!targetPlaceId.startsWith("place-custom-")) {
+        try {
+          const res = await fetch(`${BASE}/places/${encodeURIComponent(targetPlaceId)}`, {
+            headers: {
+              "X-Goog-Api-Key": apiKey,
+              "X-Goog-FieldMask":
+                "id,displayName,formattedAddress,internationalPhoneNumber,nationalPhoneNumber,websiteUri,rating,userRatingCount,googleMapsUri,addressComponents,photos,primaryTypeDisplayName,reviews,location",
+            },
+          });
+          if (res.ok) {
+            const p = (await res.json()) as any;
+            const city =
+              p.addressComponents?.find((c: any) =>
+                c.types?.some((t: string) => t === "locality" || t === "administrative_area_level_2"),
+              )?.longText ?? undefined;
 
-          let photo_url: string | undefined;
-          const photoName = p.photos?.[0]?.name as string | undefined;
-          if (photoName) {
-            photo_url = `${BASE}/${photoName}/media?maxWidthPx=800&key=${apiKey}`;
+            let photo_url: string | undefined;
+            const photoName = p.photos?.[0]?.name as string | undefined;
+            if (photoName) {
+              photo_url = `${BASE}/${photoName}/media?maxWidthPx=800&key=${apiKey}`;
+            }
+
+            const reviewsList =
+              p.reviews?.slice(0, 5).map((r: any) => ({
+                author: r.authorAttribution?.displayName ?? "Customer",
+                rating: r.rating ?? 5,
+                text: r.text?.text ?? r.originalText?.text ?? "",
+                time: r.publishTime ?? new Date().toISOString(),
+              })) ?? [];
+
+            return {
+              place_id: p.id || targetPlaceId,
+              name: p.displayName?.text ?? "",
+              address: p.formattedAddress ?? "",
+              phone: p.internationalPhoneNumber ?? p.nationalPhoneNumber ?? undefined,
+              website: p.websiteUri ?? undefined,
+              rating: p.rating ?? 4.8,
+              user_rating_count: p.userRatingCount ?? 12,
+              city,
+              photo_url,
+              google_maps_uri: p.googleMapsUri ?? `https://search.google.com/local/writereview?placeid=${targetPlaceId}`,
+              business_type: p.primaryTypeDisplayName?.text,
+              latitude: p.location?.latitude,
+              longitude: p.location?.longitude,
+              reviews: reviewsList,
+              isLiveGoogle: true,
+            };
           }
-
-          const reviewsList =
-            p.reviews?.slice(0, 5).map((r: any) => ({
-              author: r.authorAttribution?.displayName ?? "Customer",
-              rating: r.rating ?? 5,
-              text: r.text?.text ?? r.originalText?.text ?? "",
-              time: r.publishTime ?? new Date().toISOString(),
-            })) ?? [];
-
-          return {
-            place_id: p.id || data.place_id,
-            name: p.displayName?.text ?? "",
-            address: p.formattedAddress ?? "",
-            phone: p.internationalPhoneNumber ?? p.nationalPhoneNumber ?? undefined,
-            website: p.websiteUri ?? undefined,
-            rating: p.rating ?? 4.8,
-            user_rating_count: p.userRatingCount ?? 12,
-            city,
-            photo_url,
-            google_maps_uri: p.googleMapsUri ?? `https://search.google.com/local/writereview?placeid=${data.place_id}`,
-            business_type: p.primaryTypeDisplayName?.text,
-            latitude: p.location?.latitude,
-            longitude: p.location?.longitude,
-            reviews: reviewsList,
-            isLiveGoogle: true,
-          };
+        } catch {
+          /* fallback below */
         }
-      } catch {
-        /* fallback below */
+      }
+
+      // If direct fetch fails or place_id is custom, search by business_name
+      if (data.business_name) {
+        try {
+          const sRes = await fetch(`${BASE}/places:searchText`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Goog-Api-Key": apiKey,
+              "X-Goog-FieldMask":
+                "places.id,places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.googleMapsUri,places.photos,places.reviews",
+            },
+            body: JSON.stringify({
+              textQuery: data.business_name,
+              regionCode: "IN",
+            }),
+          });
+          if (sRes.ok) {
+            const sJson = (await sRes.json()) as any;
+            const p = sJson.places?.[0];
+            if (p) {
+              const reviewsList =
+                p.reviews?.slice(0, 5).map((r: any) => ({
+                  author: r.authorAttribution?.displayName ?? "Customer",
+                  rating: r.rating ?? 5,
+                  text: r.text?.text ?? r.originalText?.text ?? "",
+                  time: r.publishTime ?? new Date().toISOString(),
+                })) ?? [];
+
+              let photo_url: string | undefined;
+              const photoName = p.photos?.[0]?.name;
+              if (photoName) {
+                photo_url = `${BASE}/${photoName}/media?maxWidthPx=800&key=${apiKey}`;
+              }
+
+              return {
+                place_id: p.id,
+                name: p.displayName?.text ?? data.business_name,
+                address: p.formattedAddress ?? "",
+                rating: p.rating ?? 5,
+                user_rating_count: p.userRatingCount ?? reviewsList.length,
+                photo_url,
+                google_maps_uri: p.googleMapsUri ?? `https://search.google.com/local/writereview?placeid=${p.id}`,
+                reviews: reviewsList,
+                isLiveGoogle: true,
+              };
+            }
+          }
+        } catch {
+          /* fallback below */
+        }
       }
     }
 

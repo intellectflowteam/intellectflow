@@ -38,11 +38,11 @@ function Reviews() {
   });
 
   const google = useQuery({
-    queryKey: ["google-reviews", biz?.place_id],
-    enabled: !!biz?.place_id,
+    queryKey: ["google-reviews", biz?.place_id, biz?.name, biz?.gmb_link],
+    enabled: !!biz?.id,
     staleTime: 5 * 60 * 1000,
     retry: false,
-    queryFn: async () => details({ data: { place_id: biz!.place_id! } }),
+    queryFn: async () => details({ data: { place_id: biz?.place_id || biz?.gmb_link || "place-custom-1", business_name: biz?.name } }),
   });
 
   return (
