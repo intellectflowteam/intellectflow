@@ -39,6 +39,21 @@ function Comp() {
     setBusy(true);
     try {
       const d = await details({ data: { place_id: s.place_id } });
+
+      // Check if already added
+      const { data: existing } = await supabase
+        .from("competitors")
+        .select("id")
+        .eq("business_id", biz.id)
+        .eq("competitor_name", d.name)
+        .maybeSingle();
+
+      if (existing) {
+        setQ("");
+        toast.info(`${d.name} is already in your competitor list`);
+        return;
+      }
+
       const { error } = await supabase.from("competitors").insert({
         business_id: biz.id,
         competitor_name: d.name,
@@ -148,18 +163,32 @@ function Comp() {
         ];
       }
 
-      const { error } = await supabase.from("competitors").upsert(
-        fetchResults.map((r) => ({
+      // Deduplicate against competitors already saved in the database
+      const existingRes = await supabase.from("competitors").select("id, place_id, competitor_name").eq("business_id", biz.id);
+      const existingRows = existingRes.data ?? [];
+      const existingPlaceIds = new Set(existingRows.map((r) => r.place_id).filter(Boolean));
+      const existingNames = new Set(existingRows.map((r) => r.competitor_name.toLowerCase().trim()));
+
+      const newRowsToInsert = fetchResults
+        .filter((r) => !existingPlaceIds.has(r.place_id) && !existingNames.has(r.name.toLowerCase().trim()))
+        .map((r) => ({
           business_id: biz.id,
           competitor_name: r.name,
           competitor_address: r.address,
           competitor_rating: r.rating ?? null,
           competitor_reviews: r.user_rating_count ?? null,
           place_id: r.place_id,
-        })),
-        { onConflict: "business_id,place_id" },
-      );
-      if (error) throw new Error(error.message);
+        }));
+
+      if (newRowsToInsert.length > 0) {
+        const { error } = await supabase.from("competitors").insert(newRowsToInsert);
+        if (error) {
+          // Row-by-row fallback insert if bulk insert hits any duplicate key
+          for (const row of newRowsToInsert) {
+            await supabase.from("competitors").insert(row).catch(() => {});
+          }
+        }
+      }
 
       qc.invalidateQueries({ queryKey: ["comp", biz.id] });
       toast.success(`${fetchResults.length} nearby competitors tracked`);
