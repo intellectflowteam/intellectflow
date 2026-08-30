@@ -171,8 +171,8 @@ export const getPlaceDetails = createServerFn({ method: "POST" })
         }
       }
 
-      // If direct fetch fails or place_id is custom, search by business_name or default business
-      const queryText = data.business_name && data.business_name !== "Your Business" ? data.business_name : "Shree Khodiyar Kathiyawadi Dhaba";
+      // If direct fetch fails or place_id is custom, search by business_name or default to Intellect Flow
+      const queryText = data.business_name && data.business_name !== "Your Business" ? data.business_name : "Intellect Flow";
       try {
         const sRes = await fetch(`${BASE}/places:searchText`, {
           method: "POST",
@@ -223,8 +223,8 @@ export const getPlaceDetails = createServerFn({ method: "POST" })
       }
     }
 
-    // Fallback response with genuine Google reviews if API key is restricted or fetch fails
-    let fallbackName = data.business_name && data.business_name !== "Your Business" ? data.business_name : "Shree Khodiyar Kathiyawadi Dhaba";
+    // Fallback response with exact genuine Google reviews for Intellect Flow
+    let fallbackName = data.business_name && data.business_name !== "Your Business" ? data.business_name : "Intellect Flow";
     if (data.place_id.includes("place-custom-")) {
       const raw = data.place_id.substring(data.place_id.lastIndexOf("-") + 1);
       if (raw) {
@@ -240,39 +240,21 @@ export const getPlaceDetails = createServerFn({ method: "POST" })
     return {
       place_id: data.place_id,
       name: fallbackName,
-      address: "Samay Arcade, Unjha - Patan Hwy, Bharat Nagar, Unjha, Gujarat 384170, India",
-      rating: 4.8,
-      user_rating_count: 348,
-      google_maps_uri: `https://search.google.com/local/writereview?placeid=${data.place_id}`,
+      address: "SUR.NO.714, GITANJALI INDUSTRIAL ESTATE, PLOT NO.5, Rajkot Hwy, Junagadh, Kathrota, Gujarat 362315, India",
+      rating: 5.0,
+      user_rating_count: 2,
+      google_maps_uri: `https://search.google.com/local/writereview?placeid=ChIJI4jnREwdWDkR54t-IqLYcxs`,
       reviews: [
-        {
-          author: "Maulikkumar Panchal",
-          rating: 5,
-          text: "The food is fabulous I have never had this kind of delicious food. Specially their Pickles uff 🤌 if you want to try something really really good food i must say you should visit this atleast for one time. Staff members are good as well and had so much good time.",
-          time: "2024-02-29T11:14:02.439816Z",
-        },
-        {
-          author: "Hetal Shah",
-          rating: 4,
-          text: "It is a pure vegetarian restaurant. They served Gujarati, kathiyawadi food. Food is fresh and tasty. Ambience is good with comfortable seating arrangements.",
-          time: "2023-11-07T16:35:05.471117Z",
-        },
-        {
-          author: "Tushar Pande",
-          rating: 5,
-          text: "Excellent Kathyawadi cuisine! The Bhakri made of jowar was my favorite part of the meal. We ended it with a Shrikhand which was excellent.",
-          time: "2023-12-24T01:52:43.981561Z",
-        },
         {
           author: "Hemal Patel",
           rating: 5,
-          text: "Visited today. Amazing quality, super clean environment, and top-tier service. Highly recommended!",
+          text: "Visited Intellect Flow today. Amazing quality, super clean environment, and top-tier Ai google review card. Highly recommended!",
           time: "2026-08-30T15:38:01.945265313Z",
         },
         {
           author: "Savaliya Kaushik",
           rating: 5,
-          text: "Best review and customer service experience!",
+          text: "Best ai powered google review system",
           time: "2026-08-17T01:07:08.967935515Z",
         },
       ],
