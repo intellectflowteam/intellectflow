@@ -41,6 +41,7 @@ function Reviews() {
     queryKey: ["google-reviews", biz?.place_id],
     enabled: !!biz?.place_id,
     staleTime: 5 * 60 * 1000,
+    retry: false,
     queryFn: async () => details({ data: { place_id: biz!.place_id! } }),
   });
 
