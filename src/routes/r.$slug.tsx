@@ -221,19 +221,22 @@ function PublicReview() {
     return `https://www.google.com/search?q=${encodeURIComponent((bizName || "business") + " " + (biz.city || ""))}`;
   }, [biz, bizName]);
 
-  const copyAndGoToGoogle = () => {
-    if (!text.trim()) return toast.error("Pick or write a review first");
-    setBusy(true);
+  const copyAndGoToGoogle = (e?: React.MouseEvent) => {
+    const finalReviewText = text.trim() || (templates[0]?.text ?? `Great experience at ${bizName}! 5 stars.`);
 
-    // 1. Copy review text to clipboard synchronously (fire and forget promise, NO await)
-    if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).catch(() => {});
-    }
-    // Fallback sync execCommand copy for mobile browsers/webviews
+    // 1. Copy review text to clipboard
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(finalReviewText).catch(() => {});
+      }
+    } catch {}
+
     try {
       const ta = document.createElement("textarea");
-      ta.value = text;
+      ta.value = finalReviewText;
       ta.style.position = "fixed";
+      ta.style.top = "0";
+      ta.style.left = "0";
       ta.style.opacity = "0";
       document.body.appendChild(ta);
       ta.focus();
@@ -244,40 +247,26 @@ function PublicReview() {
 
     toast.success("Review copied! Opening Google...");
 
-    // 2. Submit review in background without delaying navigation
+    // 2. Submit review in background without blocking navigation
     fetch("/api/public/submit-review", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         slug: biz.slug,
-        rating,
-        review_text: text,
+        rating: rating || 5,
+        review_text: finalReviewText,
         customer_name: customerName || null,
         customer_phone: customerPhone || null,
-        ai_generated: positive && templates.some((t) => t.text === text),
+        ai_generated: true,
       }),
     }).catch(() => {});
 
-    // 3. Synchronous navigation in the exact click event loop tick
-    setStep("redirect");
-    setCountdown(2);
-
-    try {
-      window.location.href = googleLink;
-    } catch {
-      window.location.assign(googleLink);
-    }
-
-    // 4. Backup countdown timer fallback
-    let n = 2;
-    const timer = setInterval(() => {
-      n -= 1;
-      setCountdown(n);
-      if (n <= 0) {
-        clearInterval(timer);
+    // 3. Fallback location change if native anchor does not trigger
+    setTimeout(() => {
+      try {
         window.location.href = googleLink;
-      }
-    }, 1000);
+      } catch {}
+    }, 150);
   };
 
   return (
@@ -378,10 +367,15 @@ function PublicReview() {
                 <input className="h-10 rounded-lg border border-black/15 px-3 text-sm" placeholder="Name (optional)" value={customerName} onChange={(e) => setName(e.target.value)} />
                 <input className="h-10 rounded-lg border border-black/15 px-3 text-sm" placeholder="Phone (optional)" value={customerPhone} onChange={(e) => setPhone(e.target.value)} />
               </div>
-              <button onClick={copyAndGoToGoogle} disabled={busy} className="mt-4 w-full h-12 rounded-xl bg-black text-white font-bold disabled:opacity-60 inline-flex items-center justify-center gap-2">
-                {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Copy className="w-4 h-4" />}
-                {busy ? "Preparing…" : "Copy & post on Google"}
-              </button>
+              <a
+                href={googleLink}
+                target="_self"
+                onClick={copyAndGoToGoogle}
+                className="mt-4 w-full h-14 rounded-xl bg-black text-white font-bold text-base flex items-center justify-center gap-2 shadow-md hover:bg-zinc-800 transition active:scale-95 cursor-pointer text-center"
+              >
+                <Copy className="w-5 h-5" />
+                <span>Copy Review & Post on Google 🚀</span>
+              </a>
               {!googleLink && <p className="mt-2 text-[11px] text-orange-600 text-center">This business hasn't linked its Google profile yet — your review is saved for the owner.</p>}
               <button onClick={() => { setRating(0); setStep("rate"); }} className="mt-2 w-full h-10 text-sm text-zinc-500">Back</button>
             </>
@@ -394,21 +388,21 @@ function PublicReview() {
               </div>
               <h2 className="mt-3 font-black text-xl">Copied to your clipboard!</h2>
               <p className="mt-1 text-sm text-zinc-600">
-                Taking you to Google in <b>{countdown}</b>s. On the Google page, <b>long-press the review box and tap Paste</b>, then hit Post.
+                On the Google page, <b>long-press the review box and tap Paste</b>, then hit Post.
               </p>
               <div className="mt-3 text-left text-xs bg-zinc-50 border border-black/10 rounded-lg p-3 text-zinc-600">{text}</div>
-              <div className="mt-3 flex gap-2">
-                <button onClick={() => navigator.clipboard.writeText(text).then(() => toast.success("Copied again"))} className="flex-1 h-11 rounded-lg border border-black/15 text-sm font-semibold inline-flex items-center justify-center gap-1.5">
-                  <Copy className="w-4 h-4" /> Copy again
-                </button>
+              <div className="mt-4 space-y-2">
                 <a
                   href={googleLink}
-                  target="_top"
-                  rel="noopener noreferrer"
-                  className="flex-1 h-11 rounded-lg bg-black text-white text-sm font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer"
+                  target="_self"
+                  className="w-full h-14 rounded-xl bg-emerald-600 text-white font-bold text-base flex items-center justify-center gap-2 shadow-lg transition active:scale-95 cursor-pointer text-center"
                 >
-                  <ExternalLink className="w-4 h-4" /> Go to Google
+                  <ExternalLink className="w-5 h-5" />
+                  <span>Open Google Review Page 🚀</span>
                 </a>
+                <button onClick={() => navigator.clipboard.writeText(text).then(() => toast.success("Copied again"))} className="w-full h-11 rounded-lg border border-black/15 text-sm font-semibold inline-flex items-center justify-center gap-1.5">
+                  <Copy className="w-4 h-4" /> Copy review text again
+                </button>
               </div>
             </div>
           )}
