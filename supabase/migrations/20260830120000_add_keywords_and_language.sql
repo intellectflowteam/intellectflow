@@ -7,7 +7,7 @@ ALTER TABLE public.businesses
 DROP VIEW IF EXISTS public.businesses_public;
 
 CREATE VIEW public.businesses_public AS
-  SELECT id, name, slug, gmb_link, rating, total_reviews, city, address,
+  SELECT id, name, slug, gmb_link, place_id, rating, total_reviews, city, address,
          description, business_type, photo_url, target_keywords, preferred_language
   FROM public.businesses;
 

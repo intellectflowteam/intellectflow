@@ -214,60 +214,61 @@ function PublicReview() {
     }
   };
 
-  const [targetUrl, setTargetUrl] = useState<string>("");
+  const googleLink = useMemo(() => {
+    const placeId = (biz as any).place_id;
+    if (placeId) return `https://search.google.com/local/writereview?placeid=${placeId}`;
+    if (biz.gmb_link) return biz.gmb_link;
+    return `https://www.google.com/search?q=${encodeURIComponent((bizName || "business") + " " + (biz.city || ""))}`;
+  }, [biz, bizName]);
 
   const copyAndGoToGoogle = async () => {
     if (!text.trim()) return toast.error("Pick or write a review first");
     setBusy(true);
+
+    // 1. Copy review text to clipboard immediately
     try {
-      try {
-        await navigator.clipboard.writeText(text);
-      } catch {
-        /* clipboard may be blocked; the review text is still shown below */
-      }
-      const json = await submit(true);
-      toast.success("Review copied! Paste it in Google's review box.");
-      const link =
-        (biz as any).place_id
-          ? `https://search.google.com/local/writereview?placeid=${(biz as any).place_id}`
-          : (json.gmb_link || biz.gmb_link || `https://www.google.com/search?q=${encodeURIComponent(bizName + " " + (biz.city || ""))}`);
-      setTargetUrl(link);
-
-      if (link) {
-        setStep("redirect");
-
-        // Try immediate redirect in case timer is throttled by mobile webview
-        try {
-          window.location.href = link;
-        } catch {
-          /* ignore */
-        }
-
-        let n = 2;
-        setCountdown(n);
-        const timer = setInterval(() => {
-          n -= 1;
-          setCountdown(n);
-          if (n <= 0) {
-            clearInterval(timer);
-            window.location.href = link;
-          }
-        }, 1000);
-      } else {
-        setStep("done");
-      }
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Submit failed");
-    } finally {
-      setBusy(false);
+      await navigator.clipboard.writeText(text);
+    } catch {
+      /* clipboard blocked on some webviews */
     }
-  };
 
-  const googleLink =
-    targetUrl ||
-    ((biz as any).place_id
-      ? `https://search.google.com/local/writereview?placeid=${(biz as any).place_id}`
-      : (biz.gmb_link || `https://www.google.com/search?q=${encodeURIComponent(bizName + " " + (biz.city || ""))}`));
+    toast.success("Review copied! Opening Google...");
+
+    // 2. Submit review in background without delaying user navigation
+    fetch("/api/public/submit-review", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        slug: biz.slug,
+        rating,
+        review_text: text,
+        customer_name: customerName || null,
+        customer_phone: customerPhone || null,
+        ai_generated: positive && templates.some((t) => t.text === text),
+      }),
+    }).catch(() => {});
+
+    // 3. Immediately trigger navigation before browser discards click gesture
+    setStep("redirect");
+    setCountdown(2);
+
+    try {
+      window.location.assign(googleLink);
+    } catch {
+      window.location.href = googleLink;
+    }
+
+    // 4. Backup countdown timer fallback
+    let n = 2;
+    const timer = setInterval(() => {
+      n -= 1;
+      setCountdown(n);
+      if (n <= 0) {
+        clearInterval(timer);
+        window.location.href = googleLink;
+      }
+    }, 1000);
+  };
 
   return (
     <div className="min-h-screen py-6 px-4" style={{ backgroundColor: "#fdf6ef" }}>
@@ -390,8 +391,16 @@ function PublicReview() {
                 <button onClick={() => navigator.clipboard.writeText(text).then(() => toast.success("Copied again"))} className="flex-1 h-11 rounded-lg border border-black/15 text-sm font-semibold inline-flex items-center justify-center gap-1.5">
                   <Copy className="w-4 h-4" /> Copy again
                 </button>
-                <a href={googleLink} target="_self" className="flex-1 h-11 rounded-lg bg-black text-white text-sm font-bold inline-flex items-center justify-center gap-1.5">
-                  <ExternalLink className="w-4 h-4" /> Go now
+                <a
+                  href={googleLink}
+                  target="_top"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    window.location.href = googleLink;
+                  }}
+                  className="flex-1 h-11 rounded-lg bg-black text-white text-sm font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <ExternalLink className="w-4 h-4" /> Go to Google
                 </a>
               </div>
             </div>
