@@ -25,13 +25,14 @@ export const Route = createFileRoute("/api/public/submit-review")({
           return new Response(JSON.stringify({ error: "Invalid input" }), { status: 400 });
         }
         const { slug, rating, review_text, customer_name, customer_phone, ai_generated } = parsed.data;
+        const cleanSlug = slug.trim().toLowerCase();
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
         const { data: biz, error: bizErr } = await supabaseAdmin
           .from("businesses")
           .select("id, name, gmb_link, description")
-          .eq("slug", slug)
+          .ilike("slug", cleanSlug)
           .maybeSingle();
         if (bizErr || !biz) {
           return new Response(JSON.stringify({ error: "Business not found" }), { status: 404 });

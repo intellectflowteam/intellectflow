@@ -5,6 +5,19 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+export function slugify(s: string): string {
+  if (!s) return "shop-" + Math.floor(1000 + Math.random() * 9000);
+  const clean = s
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 80);
+
+  if (clean.length >= 2) return clean;
+  return "biz-" + Math.floor(10000 + Math.random() * 90000);
+}
+
 export type BusinessMeta = {
   keywords: string[];
   preferredLanguage: string;

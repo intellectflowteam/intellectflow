@@ -10,16 +10,18 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/r/$slug")({
   ssr: false,
   loader: async ({ params }) => {
-    // 1. Exact match
+    const cleanSlug = (params.slug || "").trim().toLowerCase();
+
+    // 1. Exact match (case insensitive)
     let { data } = await supabase
       .from("businesses_public")
       .select("*")
-      .eq("slug", params.slug)
+      .ilike("slug", cleanSlug)
       .maybeSingle();
 
     // 2. Multi-tier smart fallback for all businesses so links never break
-    if (!data && params.slug) {
-      const parts = params.slug.split("-").filter(Boolean);
+    if (!data && cleanSlug) {
+      const parts = cleanSlug.split("-").filter(Boolean);
 
       // Try 3-word prefix
       if (!data && parts.length >= 3) {
@@ -187,6 +189,8 @@ function PublicReview() {
     }
   };
 
+  const [targetUrl, setTargetUrl] = useState<string>("");
+
   const copyAndGoToGoogle = async () => {
     if (!text.trim()) return toast.error("Pick or write a review first");
     setBusy(true);
@@ -198,11 +202,22 @@ function PublicReview() {
       }
       const json = await submit(true);
       toast.success("Review copied! Paste it in Google's review box.");
-      const link = (biz as any).place_id
-        ? `https://search.google.com/local/writereview?placeid=${(biz as any).place_id}`
-        : (json.gmb_link ?? biz.gmb_link ?? `https://www.google.com/search?q=${encodeURIComponent(bizName)}`);
+      const link =
+        (biz as any).place_id
+          ? `https://search.google.com/local/writereview?placeid=${(biz as any).place_id}`
+          : (json.gmb_link || biz.gmb_link || `https://www.google.com/search?q=${encodeURIComponent(bizName + " " + (biz.city || ""))}`);
+      setTargetUrl(link);
+
       if (link) {
         setStep("redirect");
+
+        // Try immediate redirect in case timer is throttled by mobile webview
+        try {
+          window.location.href = link;
+        } catch {
+          /* ignore */
+        }
+
         let n = 2;
         setCountdown(n);
         const timer = setInterval(() => {
@@ -223,7 +238,11 @@ function PublicReview() {
     }
   };
 
-  const googleLink = biz.gmb_link ?? "";
+  const googleLink =
+    targetUrl ||
+    ((biz as any).place_id
+      ? `https://search.google.com/local/writereview?placeid=${(biz as any).place_id}`
+      : (biz.gmb_link || `https://www.google.com/search?q=${encodeURIComponent(bizName + " " + (biz.city || ""))}`));
 
   return (
     <div className="min-h-screen py-6 px-4" style={{ backgroundColor: "#fdf6ef" }}>
@@ -346,7 +365,7 @@ function PublicReview() {
                 <button onClick={() => navigator.clipboard.writeText(text).then(() => toast.success("Copied again"))} className="flex-1 h-11 rounded-lg border border-black/15 text-sm font-semibold inline-flex items-center justify-center gap-1.5">
                   <Copy className="w-4 h-4" /> Copy again
                 </button>
-                <a href={googleLink} className="flex-1 h-11 rounded-lg bg-black text-white text-sm font-bold inline-flex items-center justify-center gap-1.5">
+                <a href={googleLink} target="_self" className="flex-1 h-11 rounded-lg bg-black text-white text-sm font-bold inline-flex items-center justify-center gap-1.5">
                   <ExternalLink className="w-4 h-4" /> Go now
                 </a>
               </div>

@@ -1355,7 +1355,15 @@ function BizTable({ rows }: { rows: Array<{ id: string; name: string; slug: stri
 }
 
 function slugify(v: string) {
-  return v.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 80);
+  if (!v) return "shop-" + Math.floor(1000 + Math.random() * 9000);
+  const clean = v
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 80);
+  if (clean.length >= 2) return clean;
+  return "biz-" + Math.floor(10000 + Math.random() * 90000);
 }
 
 function AdminOnboard() {

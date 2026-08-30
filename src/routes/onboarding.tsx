@@ -5,8 +5,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { getPlaceDetails, type PlaceDetails, type PlaceSuggestion } from "@/lib/places.functions";
 import { PlaceSearchInput } from "@/components/PlaceSearchInput";
 import { QRCodeSVG } from "qrcode.react";
-import { toast } from "sonner";
 import { Check, ArrowRight, Download, Star } from "lucide-react";
+import { slugify } from "@/lib/utils";
 
 export const Route = createFileRoute("/onboarding")({
   ssr: false,
@@ -32,10 +32,6 @@ const PLANS: { id: "starter" | "growth" | "pro"; price: number; market: string; 
   { id: "growth", price: 599, market: "Rs 25k/mo", label: "Growth", popular: true },
   { id: "pro", price: 1299, market: "Rs 55k+/mo", label: "Pro" },
 ];
-
-function slugify(s: string) {
-  return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 80);
-}
 
 function Onboarding() {
   const nav = useNavigate();
