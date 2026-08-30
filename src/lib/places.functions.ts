@@ -171,56 +171,55 @@ export const getPlaceDetails = createServerFn({ method: "POST" })
         }
       }
 
-      // If direct fetch fails or place_id is custom, search by business_name
-      if (data.business_name) {
-        try {
-          const sRes = await fetch(`${BASE}/places:searchText`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-Goog-Api-Key": apiKey,
-              "X-Goog-FieldMask":
-                "places.id,places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.googleMapsUri,places.photos,places.reviews",
-            },
-            body: JSON.stringify({
-              textQuery: data.business_name,
-              regionCode: "IN",
-            }),
-          });
-          if (sRes.ok) {
-            const sJson = (await sRes.json()) as any;
-            const p = sJson.places?.[0];
-            if (p) {
-              const reviewsList =
-                p.reviews?.slice(0, 5).map((r: any) => ({
-                  author: r.authorAttribution?.displayName ?? "Customer",
-                  rating: r.rating ?? 5,
-                  text: r.text?.text ?? r.originalText?.text ?? "",
-                  time: r.publishTime ?? new Date().toISOString(),
-                })) ?? [];
+      // If direct fetch fails or place_id is custom, search by business_name or default business
+      const queryText = data.business_name && data.business_name !== "Your Business" ? data.business_name : "Shree Khodiyar Kathiyawadi Dhaba";
+      try {
+        const sRes = await fetch(`${BASE}/places:searchText`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Goog-Api-Key": apiKey,
+            "X-Goog-FieldMask":
+              "places.id,places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.googleMapsUri,places.photos,places.reviews",
+          },
+          body: JSON.stringify({
+            textQuery: queryText,
+            regionCode: "IN",
+          }),
+        });
+        if (sRes.ok) {
+          const sJson = (await sRes.json()) as any;
+          const p = sJson.places?.[0];
+          if (p) {
+            const reviewsList =
+              p.reviews?.slice(0, 5).map((r: any) => ({
+                author: r.authorAttribution?.displayName ?? "Customer",
+                rating: r.rating ?? 5,
+                text: r.text?.text ?? r.originalText?.text ?? "",
+                time: r.publishTime ?? new Date().toISOString(),
+              })) ?? [];
 
-              let photo_url: string | undefined;
-              const photoName = p.photos?.[0]?.name;
-              if (photoName) {
-                photo_url = `${BASE}/${photoName}/media?maxWidthPx=800&key=${apiKey}`;
-              }
-
-              return {
-                place_id: p.id,
-                name: p.displayName?.text ?? data.business_name,
-                address: p.formattedAddress ?? "",
-                rating: p.rating ?? 5,
-                user_rating_count: p.userRatingCount ?? reviewsList.length,
-                photo_url,
-                google_maps_uri: p.googleMapsUri ?? `https://search.google.com/local/writereview?placeid=${p.id}`,
-                reviews: reviewsList,
-                isLiveGoogle: true,
-              };
+            let photo_url: string | undefined;
+            const photoName = p.photos?.[0]?.name;
+            if (photoName) {
+              photo_url = `${BASE}/${photoName}/media?maxWidthPx=800&key=${apiKey}`;
             }
+
+            return {
+              place_id: p.id,
+              name: p.displayName?.text ?? queryText,
+              address: p.formattedAddress ?? "",
+              rating: p.rating ?? 5,
+              user_rating_count: p.userRatingCount ?? reviewsList.length,
+              photo_url,
+              google_maps_uri: p.googleMapsUri ?? `https://search.google.com/local/writereview?placeid=${p.id}`,
+              reviews: reviewsList,
+              isLiveGoogle: true,
+            };
           }
-        } catch {
-          /* fallback below */
         }
+      } catch {
+        /* fallback below */
       }
     }
 
