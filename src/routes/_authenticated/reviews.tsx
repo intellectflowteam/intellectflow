@@ -277,9 +277,8 @@ function AiReplyBox({
 
   const copyAndOpen = async (text: string) => {
     await navigator.clipboard.writeText(text).catch(() => {});
-    toast.success("Reply copied! Opening Google Review page...");
-    const url = mapsUri || "https://business.google.com/reviews";
-    window.open(url, "_blank");
+    toast.success("Reply copied to clipboard! Opening Google Business Manager...");
+    window.open("https://business.google.com/reviews", "_blank");
   };
 
   return (
