@@ -1,12 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { getMyBusiness } from "@/lib/queries";
 import { getPlaceDetails } from "@/lib/places.functions";
 import { aiReply } from "@/lib/ai.functions";
+import { parseBusinessMeta } from "@/lib/utils";
 import { Star, Loader2, RefreshCw, ExternalLink, Sparkles, Copy } from "lucide-react";
 
 
