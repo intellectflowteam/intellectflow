@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
@@ -8,7 +8,8 @@ import { getMyBusiness } from "@/lib/queries";
 import { getPlaceDetails } from "@/lib/places.functions";
 import { aiReply } from "@/lib/ai.functions";
 import { parseBusinessMeta } from "@/lib/utils";
-import { Star, Loader2, RefreshCw, ExternalLink, Sparkles, Copy } from "lucide-react";
+import { PlaceSearchInput } from "@/components/PlaceSearchInput";
+import { Star, Loader2, RefreshCw, ExternalLink, Sparkles, Copy, Search, MapPin } from "lucide-react";
 
 
 export const Route = createFileRoute("/_authenticated/reviews")({
@@ -30,6 +31,8 @@ function Reviews() {
   const [tab, setTab] = useState<"google" | "collected">("google");
   const details = useServerFn(getPlaceDetails);
   const meta = useMemo(() => parseBusinessMeta(biz), [biz]);
+  const qc = useQueryClient();
+  const [linking, setLinking] = useState(false);
 
   const { data: reviews } = useQuery({
     queryKey: ["all-reviews", biz?.id],
@@ -110,11 +113,47 @@ function Reviews() {
               </div>
               <div className="divide-y divide-black/5">
                 {(google.data.reviews ?? []).length === 0 && (
-                  <div className="p-8 text-center space-y-2">
-                    <div className="text-sm font-bold text-zinc-800">No public Google reviews returned yet.</div>
-                    <p className="text-xs text-zinc-500 max-w-md mx-auto">
-                      Check your <strong>COLLECTED</strong> tab to view reviews submitted directly by customers through your QR code ({(reviews ?? []).length}).
-                    </p>
+                  <div className="p-8 text-center space-y-4 max-w-lg mx-auto">
+                    <div className="space-y-1">
+                      <div className="text-base font-bold text-zinc-900 inline-flex items-center gap-2">
+                        <MapPin className="w-4 h-4 text-amber-600" /> Connect Your Google Business Profile
+                      </div>
+                      <p className="text-xs text-zinc-500">
+                        Type your shop or business name on Google Maps below to link YOUR business and load only YOUR 100% original live Google reviews.
+                      </p>
+                    </div>
+                    <div className="text-left">
+                      <PlaceSearchInput
+                        placeholder="Type your shop name on Google Maps..."
+                        disabled={linking}
+                        onSelect={async (s) => {
+                          if (!biz?.id) return;
+                          setLinking(true);
+                          try {
+                            const gmb_link = s.google_maps_uri || `https://search.google.com/local/writereview?placeid=${s.place_id}`;
+                            const { error } = await supabase
+                              .from("businesses")
+                              .update({
+                                place_id: s.place_id,
+                                gmb_link: gmb_link,
+                                name: s.name,
+                                address: s.address,
+                              } as any)
+                              .eq("id", biz.id);
+
+                            if (error) throw error;
+                            toast.success(`Connected to ${s.name}!`);
+                            await qc.invalidateQueries({ queryKey: ["biz"] });
+                            await qc.invalidateQueries({ queryKey: ["google-reviews"] });
+                          } catch (e) {
+                            console.error(e);
+                            toast.error("Failed to link business profile");
+                          } finally {
+                            setLinking(false);
+                          }
+                        }}
+                      />
+                    </div>
                   </div>
                 )}
                 {(google.data.reviews ?? []).map((r, i) => (

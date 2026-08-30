@@ -171,94 +171,70 @@ export const getPlaceDetails = createServerFn({ method: "POST" })
         }
       }
 
-      // If direct fetch fails or place_id is custom, search by business_name or default to Intellect Flow
-      const queryText = data.business_name && data.business_name !== "Your Business" ? data.business_name : "Intellect Flow";
-      try {
-        const sRes = await fetch(`${BASE}/places:searchText`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Goog-Api-Key": apiKey,
-            "X-Goog-FieldMask":
-              "places.id,places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.googleMapsUri,places.photos,places.reviews",
-          },
-          body: JSON.stringify({
-            textQuery: queryText,
-            regionCode: "IN",
-          }),
-        });
-        if (sRes.ok) {
-          const sJson = (await sRes.json()) as any;
-          const p = sJson.places?.[0];
-          if (p) {
-            const reviewsList =
-              p.reviews?.slice(0, 5).map((r: any) => ({
-                author: r.authorAttribution?.displayName ?? "Customer",
-                rating: r.rating ?? 5,
-                text: r.text?.text ?? r.originalText?.text ?? "",
-                time: r.publishTime ?? new Date().toISOString(),
-              })) ?? [];
-
-            let photo_url: string | undefined;
-            const photoName = p.photos?.[0]?.name;
-            if (photoName) {
-              photo_url = `${BASE}/${photoName}/media?maxWidthPx=800&key=${apiKey}`;
-            }
-
-            return {
-              place_id: p.id,
-              name: p.displayName?.text ?? queryText,
-              address: p.formattedAddress ?? "",
-              rating: p.rating ?? 5,
-              user_rating_count: p.userRatingCount ?? reviewsList.length,
-              photo_url,
-              google_maps_uri: p.googleMapsUri ?? `https://search.google.com/local/writereview?placeid=${p.id}`,
-              reviews: reviewsList,
-              isLiveGoogle: true,
-            };
-          }
-        }
-      } catch {
-        /* fallback below */
-      }
-    }
-
-    // Fallback response with exact genuine Google reviews for Intellect Flow
-    let fallbackName = data.business_name && data.business_name !== "Your Business" ? data.business_name : "Intellect Flow";
-    if (data.place_id.includes("place-custom-")) {
-      const raw = data.place_id.substring(data.place_id.lastIndexOf("-") + 1);
-      if (raw) {
+      // 2. Dynamic text search by business_name if place_id is custom or direct fetch failed
+      if (data.business_name && data.business_name !== "Your Business") {
         try {
-          const decoded = decodeURIComponent(raw);
-          if (decoded && decoded.length >= 2 && decoded !== "custom-1") {
-            fallbackName = decoded.charAt(0).toUpperCase() + decoded.slice(1);
+          const sRes = await fetch(`${BASE}/places:searchText`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Goog-Api-Key": apiKey,
+              "X-Goog-FieldMask":
+                "places.id,places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.googleMapsUri,places.photos,places.reviews",
+            },
+            body: JSON.stringify({
+              textQuery: data.business_name,
+              regionCode: "IN",
+            }),
+          });
+          if (sRes.ok) {
+            const sJson = (await sRes.json()) as any;
+            const p = sJson.places?.[0];
+            if (p) {
+              const reviewsList =
+                p.reviews?.slice(0, 5).map((r: any) => ({
+                  author: r.authorAttribution?.displayName ?? "Customer",
+                  rating: r.rating ?? 5,
+                  text: r.text?.text ?? r.originalText?.text ?? "",
+                  time: r.publishTime ?? new Date().toISOString(),
+                })) ?? [];
+
+              let photo_url: string | undefined;
+              const photoName = p.photos?.[0]?.name;
+              if (photoName) {
+                photo_url = `${BASE}/${photoName}/media?maxWidthPx=800&key=${apiKey}`;
+              }
+
+              return {
+                place_id: p.id,
+                name: p.displayName?.text ?? data.business_name,
+                address: p.formattedAddress ?? "",
+                rating: p.rating ?? 5,
+                user_rating_count: p.userRatingCount ?? reviewsList.length,
+                photo_url,
+                google_maps_uri: p.googleMapsUri ?? `https://search.google.com/local/writereview?placeid=${p.id}`,
+                reviews: reviewsList,
+                isLiveGoogle: true,
+              };
+            }
           }
-        } catch {}
+        } catch {
+          /* fallback below */
+        }
       }
     }
 
+    // Default response if no place ID matched or business not linked yet
+    const fallbackName = data.business_name && data.business_name !== "Your Business" ? data.business_name : "Your Business";
     return {
       place_id: data.place_id,
       name: fallbackName,
-      address: "SUR.NO.714, GITANJALI INDUSTRIAL ESTATE, PLOT NO.5, Rajkot Hwy, Junagadh, Kathrota, Gujarat 362315, India",
-      rating: 5.0,
-      user_rating_count: 2,
-      google_maps_uri: `https://search.google.com/local/writereview?placeid=ChIJI4jnREwdWDkR54t-IqLYcxs`,
-      reviews: [
-        {
-          author: "Hemal Patel",
-          rating: 5,
-          text: "Visited Intellect Flow today. Amazing quality, super clean environment, and top-tier Ai google review card. Highly recommended!",
-          time: "2026-08-30T15:38:01.945265313Z",
-        },
-        {
-          author: "Savaliya Kaushik",
-          rating: 5,
-          text: "Best ai powered google review system",
-          time: "2026-08-17T01:07:08.967935515Z",
-        },
-      ],
-      isLiveGoogle: true,
+      address: "India",
+      rating: undefined,
+      user_rating_count: undefined,
+      google_maps_uri: `https://search.google.com/local/writereview?placeid=${data.place_id}`,
+      reviews: [],
+      isLiveGoogle: false,
     };
   });
 
