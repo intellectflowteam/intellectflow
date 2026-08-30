@@ -221,20 +221,30 @@ function PublicReview() {
     return `https://www.google.com/search?q=${encodeURIComponent((bizName || "business") + " " + (biz.city || ""))}`;
   }, [biz, bizName]);
 
-  const copyAndGoToGoogle = async () => {
+  const copyAndGoToGoogle = () => {
     if (!text.trim()) return toast.error("Pick or write a review first");
     setBusy(true);
 
-    // 1. Copy review text to clipboard immediately
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch {
-      /* clipboard blocked on some webviews */
+    // 1. Copy review text to clipboard synchronously (fire and forget promise, NO await)
+    if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).catch(() => {});
     }
+    // Fallback sync execCommand copy for mobile browsers/webviews
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+    } catch {}
 
     toast.success("Review copied! Opening Google...");
 
-    // 2. Submit review in background without delaying user navigation
+    // 2. Submit review in background without delaying navigation
     fetch("/api/public/submit-review", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -248,14 +258,14 @@ function PublicReview() {
       }),
     }).catch(() => {});
 
-    // 3. Immediately trigger navigation before browser discards click gesture
+    // 3. Synchronous navigation in the exact click event loop tick
     setStep("redirect");
     setCountdown(2);
 
     try {
-      window.location.assign(googleLink);
-    } catch {
       window.location.href = googleLink;
+    } catch {
+      window.location.assign(googleLink);
     }
 
     // 4. Backup countdown timer fallback
@@ -394,10 +404,7 @@ function PublicReview() {
                 <a
                   href={googleLink}
                   target="_top"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    window.location.href = googleLink;
-                  }}
+                  rel="noopener noreferrer"
                   className="flex-1 h-11 rounded-lg bg-black text-white text-sm font-bold inline-flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <ExternalLink className="w-4 h-4" /> Go to Google
