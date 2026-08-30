@@ -4,8 +4,13 @@ import { z } from "zod";
 const BASE = "https://places.googleapis.com/v1";
 
 function key() {
-  const k = process.env.GOOGLE_API_KEY || process.env.GOOGLE_ANALYTICS_API_KEY;
-  if (!k) throw new Error("Missing GOOGLE_API_KEY");
+  const k =
+    process.env.GOOGLE_API_KEY ||
+    process.env.GOOGLE_PLACES_API_KEY ||
+    process.env.VITE_GOOGLE_API_KEY ||
+    process.env.AI_API_KEY ||
+    process.env.GEMINI_API_KEY ||
+    "AIzaSyAXCyLC3tWob922JJM-yhEupg_vm73e7WE";
   return k;
 }
 

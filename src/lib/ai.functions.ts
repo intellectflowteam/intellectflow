@@ -14,7 +14,8 @@ async function callAI(system: string, user: string) {
     process.env.GEMINI_API_KEY ||
     process.env.GOOGLE_API_KEY ||
     process.env.GOOGLE_PLACES_API_KEY ||
-    process.env.VITE_GOOGLE_API_KEY;
+    process.env.VITE_GOOGLE_API_KEY ||
+    "AIzaSyAXCyLC3tWob922JJM-yhEupg_vm73e7WE";
 
   const baseUrl = process.env.AI_BASE_URL || "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
   let model = process.env.AI_MODEL || "gemini-1.5-flash";
