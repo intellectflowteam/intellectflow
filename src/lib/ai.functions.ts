@@ -9,7 +9,13 @@ import { z } from "zod";
 //   AI_BASE_URL  - chat-completions endpoint (default: OpenAI's)
 //   AI_MODEL     - model name for that provider (default: gpt-4o-mini)
 async function callAI(system: string, user: string) {
-  const key = process.env.AI_API_KEY;
+  const key =
+    process.env.AI_API_KEY ||
+    process.env.GEMINI_API_KEY ||
+    process.env.GOOGLE_API_KEY ||
+    process.env.GOOGLE_PLACES_API_KEY ||
+    process.env.VITE_GOOGLE_API_KEY;
+
   const baseUrl = process.env.AI_BASE_URL || "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
   let model = process.env.AI_MODEL || "gemini-1.5-flash";
   if (model === "gemini-3.6-flash") model = "gemini-1.5-flash";
@@ -43,6 +49,18 @@ async function callAI(system: string, user: string) {
   } catch (err) {
     console.error("AI Fetch Error:", err);
     return "";
+  }
+}
+
+function extractJson<T>(raw: string): T | null {
+  if (!raw) return null;
+  let s = raw.trim();
+  const match = s.match(/\{[\s\S]*\}/);
+  if (match) s = match[0];
+  try {
+    return JSON.parse(s) as T;
+  } catch {
+    return null;
   }
 }
 
@@ -272,11 +290,10 @@ Write ${data.count} DIFFERENT FAQ pairs a real customer would search for or ask 
 
 Return JSON: { "faqs": [ {"question":"...","answer":"..."} ] }`;
     const raw = await callAI(system, user);
-    try {
-      const cleaned = raw.replace(/^```json\s*|\s*```$/g, "").trim();
-      const parsed = JSON.parse(cleaned) as { faqs: { question: string; answer: string }[] };
-      if (parsed.faqs?.length) return parsed;
-    } catch {}
+    if (raw) {
+      const parsed = extractJson<{ faqs: { question: string; answer: string }[] }>(raw);
+      if (parsed?.faqs?.length) return parsed;
+    }
 
     // Smart fallback FAQs if AI is rate-limited or unreachable
     const name = data.businessName || "Our Business";
@@ -290,6 +307,7 @@ Return JSON: { "faqs": [ {"question":"...","answer":"..."} ] }`;
         { question: `What services/products does ${name} specialize in?`, answer: `We specialize in top-quality ${type} solutions with customer-first service and affordable pricing.` },
         { question: `Are digital payments (UPI, Cards, GPay) accepted at ${name}?`, answer: `Yes, we accept all popular digital payment options including Google Pay, PhonePe, Paytm, and cards.` },
         { question: `How can I contact ${name} for inquiries?`, answer: `You can call us directly or visit our ${type} in ${city}. We are always happy to assist you!` },
+        { question: `Do I need a prior appointment before visiting ${name}?`, answer: `Walk-ins are always welcome! For special weekend services or bulk orders, calling ahead is recommended.` },
       ],
     };
   });
