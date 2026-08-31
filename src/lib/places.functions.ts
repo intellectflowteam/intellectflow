@@ -10,7 +10,7 @@ function key() {
     process.env.VITE_GOOGLE_API_KEY ||
     process.env.AI_API_KEY ||
     process.env.GEMINI_API_KEY ||
-    "AIzaSyAXCyLC3tWob922JJM-yhEupg_vm73e7WE";
+    "AIzaSyBni5A-gsc6zHeRW_d6oPzqOXcxy8mG1hU";
   return k;
 }
 
