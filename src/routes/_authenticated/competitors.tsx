@@ -137,6 +137,7 @@ function Comp() {
       }
 
       let fetchResults: any[] = [];
+      let nearbyErrorMessage: string | null = null;
       try {
         const res = await nearby({
           data: {
@@ -150,10 +151,16 @@ function Comp() {
           },
         });
         fetchResults = res.results || [];
-      } catch {}
+      } catch (e) {
+        nearbyErrorMessage = e instanceof Error ? e.message : "Google Places lookup failed";
+      }
 
-      // Fallback competitor recommendations if Google Places API returns 0 items
-      if (!fetchResults.length) {
+      let isMock = false;
+
+      // Fallback competitor recommendations only if Google actually failed (bad/missing API key,
+      // quota, network). A genuine "0 real competitors nearby" result is left as-is.
+      if (!fetchResults.length && nearbyErrorMessage) {
+        isMock = true;
         const city = biz.city || "Rajkot";
         const bType = biz.business_type || "Shop";
         fetchResults = [
@@ -185,13 +192,25 @@ function Comp() {
         if (error) {
           // Row-by-row fallback insert if bulk insert hits any duplicate key
           for (const row of newRowsToInsert) {
-            await supabase.from("competitors").insert(row).catch(() => {});
+            try {
+              await supabase.from("competitors").insert(row);
+            } catch {
+              /* skip rows that individually fail (e.g. duplicate) */
+            }
           }
         }
       }
 
       qc.invalidateQueries({ queryKey: ["comp", biz.id] });
-      toast.success(`${fetchResults.length} nearby competitors tracked`);
+      if (isMock) {
+        toast.warning(
+          `Couldn't reach Google Places (${nearbyErrorMessage}) — showing ${fetchResults.length} placeholder competitors instead. Fix the GOOGLE_API_KEY on the server to get real results.`,
+        );
+      } else if (fetchResults.length === 0) {
+        toast.info("No real competitors found within 2km on Google — try adding one manually.");
+      } else {
+        toast.success(`${fetchResults.length} nearby competitors tracked`);
+      }
 
       // Merge with whatever was already tracked (deduped by name) so SWOT
       // reflects the full picture, not just the new ones.

@@ -130,19 +130,20 @@ function Reviews() {
                           if (!biz?.id) return;
                           setLinking(true);
                           try {
-                            const gmb_link = s.google_maps_uri || `https://search.google.com/local/writereview?placeid=${s.place_id}`;
+                            const d = await details({ data: { place_id: s.place_id, business_name: s.primary } });
+                            const gmb_link = d.google_maps_uri || `https://search.google.com/local/writereview?placeid=${d.place_id}`;
                             const { error } = await supabase
                               .from("businesses")
                               .update({
-                                place_id: s.place_id,
+                                place_id: d.place_id,
                                 gmb_link: gmb_link,
-                                name: s.name,
-                                address: s.address,
+                                name: d.name,
+                                address: d.address,
                               } as any)
                               .eq("id", biz.id);
 
                             if (error) throw error;
-                            toast.success(`Connected to ${s.name}!`);
+                            toast.success(`Connected to ${d.name}!`);
                             await qc.invalidateQueries({ queryKey: ["biz"] });
                             await qc.invalidateQueries({ queryKey: ["google-reviews"] });
                           } catch (e) {

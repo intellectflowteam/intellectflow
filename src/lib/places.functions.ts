@@ -8,9 +8,14 @@ function key() {
     process.env.GOOGLE_API_KEY ||
     process.env.GOOGLE_PLACES_API_KEY ||
     process.env.VITE_GOOGLE_API_KEY ||
-    process.env.AI_API_KEY ||
-    process.env.GEMINI_API_KEY ||
-    "AIzaSyBni5A-gsc6zHeRW_d6oPzqOXcxy8mG1hU";
+    "";
+  if (!k) {
+    console.error(
+      "[places] No Google Places API key configured. Set GOOGLE_API_KEY in your server .env " +
+        "(Google Cloud Console → enable 'Places API (New)' → create/restrict a key). " +
+        "Business search and competitor lookup will not return real Google results until this is set.",
+    );
+  }
   return k;
 }
 
@@ -314,55 +319,69 @@ export const autocompletePlaces = createServerFn({ method: "POST" })
   .inputValidator((raw: unknown) =>
     z.object({ input: z.string().trim().min(2).max(200) }).parse(raw),
   )
-  .handler(async ({ data }): Promise<{ suggestions: PlaceSuggestion[] }> => {
+  .handler(async ({ data }): Promise<{ suggestions: PlaceSuggestion[]; source: "google" | "manual"; notice?: string }> => {
     const suggestions: PlaceSuggestion[] = [];
+    const apiKey = key();
+    let googleErrored = false;
+    let googleErrorReason = "";
 
-    // 1. Try Google Places Autocomplete API
-    try {
-      const res = await fetch(`${BASE}/places:autocomplete`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Goog-Api-Key": key() },
-        body: JSON.stringify({
-          input: data.input,
-          regionCode: "IN",
-        }),
-      });
-      if (res.ok) {
-        const json = (await res.json()) as {
-          suggestions?: Array<{
-            placePrediction?: {
-              placeId?: string;
-              structuredFormat?: { mainText?: { text?: string }; secondaryText?: { text?: string } };
-              text?: { text?: string };
-            };
-          }>;
-        };
-        const items =
-          json.suggestions
-            ?.map((s) => s.placePrediction)
-            .filter((p): p is NonNullable<typeof p> => !!p?.placeId)
-            .map((p) => ({
-              place_id: p.placeId!,
-              primary: p.structuredFormat?.mainText?.text ?? p.text?.text ?? "",
-              secondary: p.structuredFormat?.secondaryText?.text ?? "",
-            })) ?? [];
-        suggestions.push(...items);
-      } else {
-        const errText = await res.text();
-        console.warn(`[places.autocomplete] HTTP ${res.status}: ${errText}`);
+    // 1. Try Google Places Autocomplete API (skip the network call entirely if no key is set)
+    if (apiKey) {
+      try {
+        const res = await fetch(`${BASE}/places:autocomplete`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Goog-Api-Key": apiKey },
+          body: JSON.stringify({
+            input: data.input,
+            regionCode: "IN",
+          }),
+        });
+        if (res.ok) {
+          const json = (await res.json()) as {
+            suggestions?: Array<{
+              placePrediction?: {
+                placeId?: string;
+                structuredFormat?: { mainText?: { text?: string }; secondaryText?: { text?: string } };
+                text?: { text?: string };
+              };
+            }>;
+          };
+          const items =
+            json.suggestions
+              ?.map((s) => s.placePrediction)
+              .filter((p): p is NonNullable<typeof p> => !!p?.placeId)
+              .map((p) => ({
+                place_id: p.placeId!,
+                primary: p.structuredFormat?.mainText?.text ?? p.text?.text ?? "",
+                secondary: p.structuredFormat?.secondaryText?.text ?? "",
+              })) ?? [];
+          suggestions.push(...items);
+        } else {
+          const errText = await res.text();
+          console.error(`[places.autocomplete] HTTP ${res.status}: ${errText}`);
+          googleErrored = true;
+          googleErrorReason =
+            res.status === 403
+              ? "API key is not authorized for 'Places API (New)', or the key has been restricted/revoked."
+              : res.status === 429
+                ? "Google Places quota/rate limit exceeded."
+                : `Google Places returned HTTP ${res.status}.`;
+        }
+      } catch (err) {
+        console.error("[places.autocomplete] error:", err);
+        googleErrored = true;
+        googleErrorReason = "Could not reach Google Places (network error).";
       }
-    } catch (err) {
-      console.warn("[places.autocomplete] error:", err);
     }
 
     // 2. Fallback / supplement with Google Places Text Search if autocomplete gives fewer than 3 results
-    if (suggestions.length < 3) {
+    if (apiKey && suggestions.length < 3) {
       try {
         const textRes = await fetch(`${BASE}/places:searchText`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "X-Goog-Api-Key": key(),
+            "X-Goog-Api-Key": apiKey,
             "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress",
           },
           body: JSON.stringify({ textQuery: data.input, regionCode: "IN" }),
@@ -386,24 +405,44 @@ export const autocompletePlaces = createServerFn({ method: "POST" })
               existingIds.add(p.id);
             }
           }
+        } else if (suggestions.length === 0) {
+          const errText = await textRes.text();
+          console.error(`[places.searchText] HTTP ${textRes.status}: ${errText}`);
+          googleErrored = true;
+          googleErrorReason =
+            googleErrorReason || `Google Places text search returned HTTP ${textRes.status}.`;
         }
       } catch (err) {
-        console.warn("[places.searchText] fallback error:", err);
+        console.error("[places.searchText] fallback error:", err);
+        googleErrored = googleErrored || suggestions.length === 0;
       }
     }
 
-    // 3. Smart Fallback generator if Google Places API returns 0 suggestions for user input
-    if (suggestions.length === 0 && data.input.trim().length >= 2) {
-      const clean = data.input.trim();
-      const cap = clean.charAt(0).toUpperCase() + clean.slice(1);
-      suggestions.push(
-        { place_id: `place-custom-1-${encodeURIComponent(clean)}`, primary: cap, secondary: "Google Business Listing · Gujarat, India" },
-        { place_id: `place-custom-2-${encodeURIComponent(clean)}`, primary: `${cap} (Main Branch)`, secondary: "Gujarat, India" },
-        { place_id: `place-custom-3-${encodeURIComponent(clean)}`, primary: `${cap} Center`, secondary: "Main Road, Gujarat" },
-      );
+    if (suggestions.length > 0) {
+      return { suggestions, source: "google" };
     }
 
-    return { suggestions };
+    // 3. Nothing came back from Google — tell the caller *why*, and offer a single,
+    // clearly-labeled manual entry instead of fabricating look-alike Google listings.
+    let notice: string;
+    if (!apiKey) {
+      notice = "Google search isn't set up yet — you can still add your business manually.";
+    } else if (googleErrored) {
+      notice = `Couldn't reach Google Places (${googleErrorReason}) — add your business manually for now.`;
+    } else {
+      notice = "No matching Google listing found — you can add your business manually.";
+    }
+
+    if (data.input.trim().length >= 2) {
+      const clean = data.input.trim();
+      suggestions.push({
+        place_id: `place-custom-${encodeURIComponent(clean)}`,
+        primary: `Add "${clean}" manually`,
+        secondary: notice,
+      });
+    }
+
+    return { suggestions, source: "manual", notice };
   });
 
 function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number) {

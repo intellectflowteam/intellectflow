@@ -7,6 +7,7 @@ import { PlaceSearchInput } from "@/components/PlaceSearchInput";
 import { QRCodeSVG } from "qrcode.react";
 import { Check, ArrowRight, Download, Star } from "lucide-react";
 import { slugify } from "@/lib/utils";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/onboarding")({
   ssr: false,

@@ -9,13 +9,7 @@ import { z } from "zod";
 //   AI_BASE_URL  - chat-completions endpoint (default: OpenAI's)
 //   AI_MODEL     - model name for that provider (default: gpt-4o-mini)
 async function callAI(system: string, user: string) {
-  const key =
-    process.env.AI_API_KEY ||
-    process.env.GEMINI_API_KEY ||
-    process.env.GOOGLE_API_KEY ||
-    process.env.GOOGLE_PLACES_API_KEY ||
-    process.env.VITE_GOOGLE_API_KEY ||
-    "AIzaSyAXCyLC3tWob922JJM-yhEupg_vm73e7WE";
+  const key = process.env.AI_API_KEY || process.env.GEMINI_API_KEY || "";
 
   const baseUrl = process.env.AI_BASE_URL || "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
   let model = process.env.AI_MODEL || "gemini-1.5-flash";

@@ -21,6 +21,7 @@ export function PlaceSearchInput({
   const q = value ?? inner;
   const setQ = (v: string) => (onValueChange ? onValueChange(v) : setInner(v));
   const [items, setItems] = useState<PlaceSuggestion[]>([]);
+  const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
@@ -33,6 +34,7 @@ export function PlaceSearchInput({
     }
     if (q.trim().length < 2) {
       setItems([]);
+      setNotice(null);
       return;
     }
     let cancelled = false;
@@ -42,10 +44,14 @@ export function PlaceSearchInput({
         const res = await auto({ data: { input: q.trim() } });
         if (!cancelled) {
           setItems(res.suggestions);
+          setNotice(res.source === "manual" ? res.notice ?? null : null);
           setOpen(true);
         }
       } catch {
-        if (!cancelled) setItems([]);
+        if (!cancelled) {
+          setItems([]);
+          setNotice("Search is temporarily unavailable — please try again.");
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -82,6 +88,11 @@ export function PlaceSearchInput({
 
       {open && items.length > 0 && (
         <div className="absolute z-30 mt-1 w-full bg-white border border-black/10 rounded-lg shadow-lg max-h-72 overflow-auto">
+          {notice && (
+            <div className="px-3 py-2 text-[11px] text-amber-700 bg-amber-50 border-b border-amber-100">
+              {notice}
+            </div>
+          )}
           {items.map((s) => (
             <button
               key={s.place_id}
