@@ -19,6 +19,16 @@ function key() {
   return k;
 }
 
+function googleErrorText(status: number, rawBody: string): string {
+  try {
+    const parsed = JSON.parse(rawBody) as { error?: { message?: string; status?: string } };
+    if (parsed.error?.message) return parsed.error.message;
+  } catch {
+    /* body wasn't JSON */
+  }
+  return `HTTP ${status}`;
+}
+
 export type PlaceSuggestion = {
   place_id: string;
   primary: string;
@@ -83,9 +93,8 @@ export const searchPlaces = createServerFn({ method: "POST" })
     if (!res.ok) {
       const body = await res.text();
       console.error(`[places.search] ${res.status}: ${body}`);
-      if (res.status === 403) throw new Error("Google Places API key is not authorized. Enable 'Places API (New)' on the key.");
       if (res.status === 429) throw new Error("Too many searches — try again in a moment.");
-      throw new Error(`Google Places search failed (${res.status}). Try a different search.`);
+      throw new Error(`Google Places search failed: ${googleErrorText(res.status, body)}`);
     }
     const json = (await res.json()) as {
       places?: Array<{
@@ -360,12 +369,7 @@ export const autocompletePlaces = createServerFn({ method: "POST" })
           const errText = await res.text();
           console.error(`[places.autocomplete] HTTP ${res.status}: ${errText}`);
           googleErrored = true;
-          googleErrorReason =
-            res.status === 403
-              ? "API key is not authorized for 'Places API (New)', or the key has been restricted/revoked."
-              : res.status === 429
-                ? "Google Places quota/rate limit exceeded."
-                : `Google Places returned HTTP ${res.status}.`;
+          googleErrorReason = googleErrorText(res.status, errText);
         }
       } catch (err) {
         console.error("[places.autocomplete] error:", err);
@@ -409,8 +413,7 @@ export const autocompletePlaces = createServerFn({ method: "POST" })
           const errText = await textRes.text();
           console.error(`[places.searchText] HTTP ${textRes.status}: ${errText}`);
           googleErrored = true;
-          googleErrorReason =
-            googleErrorReason || `Google Places text search returned HTTP ${textRes.status}.`;
+          googleErrorReason = googleErrorReason || googleErrorText(textRes.status, errText);
         }
       } catch (err) {
         console.error("[places.searchText] fallback error:", err);
@@ -499,9 +502,8 @@ export const searchNearbyCompetitors = createServerFn({ method: "POST" })
     if (!res.ok) {
       const body = await res.text();
       console.error(`[places.searchNearby] ${res.status}: ${body}`);
-      if (res.status === 403) throw new Error("Google Places API key is not authorized. Enable 'Places API (New)' on the key.");
       if (res.status === 429) throw new Error("Too many searches — try again in a moment.");
-      throw new Error(`Nearby search failed (${res.status}).`);
+      throw new Error(`Nearby search failed: ${googleErrorText(res.status, body)}`);
     }
     const json = (await res.json()) as {
       places?: Array<{
