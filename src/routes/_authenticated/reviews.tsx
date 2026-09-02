@@ -9,6 +9,7 @@ import { getPlaceDetails } from "@/lib/places.functions";
 import { aiReply } from "@/lib/ai.functions";
 import { parseBusinessMeta } from "@/lib/utils";
 import { PlaceSearchInput } from "@/components/PlaceSearchInput";
+import { BusinessSearchExplorer } from "@/components/BusinessSearchExplorer";
 import { Star, Loader2, RefreshCw, ExternalLink, Sparkles, Copy, Search, MapPin } from "lucide-react";
 
 
@@ -28,7 +29,7 @@ export const Route = createFileRoute("/_authenticated/reviews")({
 
 function Reviews() {
   const { data: biz } = useQuery({ queryKey: ["biz"], queryFn: getMyBusiness });
-  const [tab, setTab] = useState<"google" | "collected">("google");
+  const [tab, setTab] = useState<"google" | "collected" | "search">("google");
   const details = useServerFn(getPlaceDetails);
   const meta = useMemo(() => parseBusinessMeta(biz), [biz]);
   const qc = useQueryClient();
@@ -65,8 +66,8 @@ function Reviews() {
     <div className="space-y-4">
       <div className="flex items-end justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="font-black text-2xl">Reviews</h1>
-          <p className="text-sm text-zinc-500">Live from your Google profile, plus everything collected through your QR page.</p>
+          <h1 className="font-black text-2xl">Reviews & Business Search</h1>
+          <p className="text-sm text-zinc-500">Live Google reviews, 10-attribute business auto-fetch explorer, plus QR-collected reviews.</p>
         </div>
         {tab === "google" && (
           <button onClick={() => google.refetch()} className="h-9 px-3 rounded-lg border border-black/15 bg-white text-sm font-semibold inline-flex items-center gap-1.5">
@@ -75,12 +76,18 @@ function Reviews() {
         )}
       </div>
 
-      <div className="flex items-center gap-2 border-b border-black/10 pb-3">
+      <div className="flex items-center gap-2 border-b border-black/10 pb-3 flex-wrap">
         <button
           onClick={() => setTab("google")}
           className={"h-8 px-3 rounded-full text-xs font-bold transition " + (tab === "google" ? "bg-black text-white" : "bg-black/5 text-zinc-600 hover:bg-black/10")}
         >
           LIVE GOOGLE REVIEWS
+        </button>
+        <button
+          onClick={() => setTab("search")}
+          className={"h-8 px-3 rounded-full text-xs font-bold transition " + (tab === "search" ? "bg-black text-white" : "bg-black/5 text-zinc-600 hover:bg-black/10")}
+        >
+          🔍 BUSINESS AUTO-FETCH EXPLORE (10 ATTR)
         </button>
         <button
           onClick={() => setTab("collected")}
@@ -188,6 +195,44 @@ function Reviews() {
             </>
           )}
         </div>
+      )}
+
+      {tab === "search" && (
+        <BusinessSearchExplorer
+          onImport={async (importedDetails) => {
+            if (!biz?.id) return;
+            try {
+              const gmbLink =
+                importedDetails.google_maps_uri ||
+                `https://search.google.com/local/writereview?placeid=${importedDetails.place_id}`;
+
+              const { error } = await supabase
+                .from("businesses")
+                .update({
+                  place_id: importedDetails.place_id,
+                  gmb_link: gmbLink,
+                  name: importedDetails.name,
+                  address: importedDetails.address,
+                  phone: importedDetails.phone ?? biz.phone,
+                  website: importedDetails.website ?? biz.website,
+                  description: importedDetails.description ?? biz.description,
+                  photo_url: importedDetails.photo_url || importedDetails.logo_url || biz.photo_url,
+                  business_type: importedDetails.business_type ?? biz.business_type,
+                  rating: importedDetails.rating ?? biz.rating,
+                  total_reviews: importedDetails.user_rating_count ?? biz.total_reviews,
+                } as any)
+                .eq("id", biz.id);
+
+              if (error) throw error;
+              toast.success(`Successfully imported all attributes for ${importedDetails.name}!`);
+              await qc.invalidateQueries({ queryKey: ["biz"] });
+              await qc.invalidateQueries({ queryKey: ["google-reviews"] });
+            } catch (err) {
+              console.error(err);
+              toast.error("Failed to update profile with imported business details.");
+            }
+          }}
+        />
       )}
 
       {tab === "collected" && (
