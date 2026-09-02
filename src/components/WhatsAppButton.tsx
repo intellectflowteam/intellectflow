@@ -1,11 +1,17 @@
-// Floating WhatsApp contact button — shown on every page (see __root.tsx).
-//
-// ⚠️ Replace WHATSAPP_NUMBER below with your real WhatsApp Business number
-// (with country code, no + or spaces, e.g. "919876543210") before going live.
+import { useLocation } from "@tanstack/react-router";
+
+// Floating WhatsApp contact button — shown ONLY on landing page ("/")
 const WHATSAPP_NUMBER = "917069525795";
 const DEFAULT_MESSAGE = "Hi! I want to know about IntellectFlow.";
 
 export function WhatsAppButton() {
+  const location = useLocation();
+  
+  // Show ONLY on landing page ("/")
+  if (location.pathname !== "/") {
+    return null;
+  }
+
   const href = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(DEFAULT_MESSAGE)}`;
   return (
     <a
