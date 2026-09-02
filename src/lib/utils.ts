@@ -27,7 +27,7 @@ export function parseBusinessMeta(biz?: {
   target_keywords?: any;
   preferred_language?: any;
   description?: string | null;
-}): BusinessMeta {
+} | null): BusinessMeta {
   let keywords: string[] = [];
   let preferredLanguage = (biz as any)?.preferred_language || "English";
 

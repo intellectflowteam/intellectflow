@@ -49,6 +49,28 @@ function Dashboard() {
     queryFn: async () => (await supabase.from("competitors").select("competitor_name, competitor_rating, competitor_reviews").eq("business_id", biz!.id)).data ?? [],
   });
 
+  const { data: keywordRankings } = useQuery({
+    queryKey: ["dash-keyword-rankings", biz?.id],
+    enabled: !!biz?.id,
+    queryFn: async () => {
+      // Latest snapshot per keyword — pull recent rows (checked weekly, so 200
+      // rows covers ~months of history for a handful of keywords) and keep
+      // only the newest one per keyword client-side.
+      const { data } = await supabase
+        .from("keyword_rankings")
+        .select("keyword, own_position, competitor_positions, top_results, checked_at")
+        .eq("business_id", biz!.id)
+        .order("checked_at", { ascending: false })
+        .limit(200);
+      type RankingRow = { keyword: string; own_position: number | null; competitor_positions: unknown; top_results: unknown; checked_at: string };
+      const latestByKeyword = new Map<string, RankingRow>();
+      for (const row of (data ?? []) as RankingRow[]) {
+        if (!latestByKeyword.has(row.keyword)) latestByKeyword.set(row.keyword, row);
+      }
+      return Array.from(latestByKeyword.values());
+    },
+  });
+
   const { data: gmbCount } = useQuery({
     queryKey: ["dash-gmb", biz?.id],
     enabled: !!biz?.id,
@@ -300,9 +322,9 @@ function Dashboard() {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 className="font-black text-lg inline-flex items-center gap-2 text-[var(--ink)]">
-              <Sparkles className="w-5 h-5 text-[var(--brass)]" /> Live GMB Keyword Rank Tracker
+              <Sparkles className="w-5 h-5 text-[var(--brass)]" /> GMB Keyword Rank Tracker
             </h2>
-            <p className="text-xs text-zinc-500">Live search engine ranking for your business keywords on Google Maps &amp; Search.</p>
+            <p className="text-xs text-zinc-500">Checked weekly against live Google Search results for your target keywords.</p>
           </div>
           <Link to="/settings" className="text-xs font-mono font-bold bg-[var(--ink)] text-white px-3 py-1.5 rounded-full hover:brightness-125 transition">
             Manage Keywords →
@@ -312,53 +334,78 @@ function Dashboard() {
         {(() => {
           const rawKw = (biz as any)?.target_keywords;
           const userKws: string[] = typeof rawKw === "string" && rawKw.trim()
-            ? rawKw.split(",").map((k) => k.trim()).filter(Boolean)
+            ? rawKw.split(",").map((k: string) => k.trim()).filter(Boolean)
             : Array.isArray(rawKw) ? rawKw : [];
-          const activeList = userKws.length > 0 ? userKws : [`${biz.business_type || 'Shop'} near me`, `Best ${biz.business_type || 'service'} in ${biz.city || 'Rajkot'}`, biz.name];
+
+          if (userKws.length === 0) {
+            return (
+              <div className="rounded-xl border border-dashed border-black/15 p-6 text-center text-sm text-zinc-500">
+                Add target keywords in <Link to="/settings" className="underline font-semibold text-black">Settings</Link> to start tracking your Google ranking for them.
+              </div>
+            );
+          }
+
+          const rankingByKeyword = new Map((keywordRankings ?? []).map((r) => [r.keyword, r]));
+          const lastChecked = (keywordRankings ?? [])[0]?.checked_at;
 
           return (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Currently Ranking Keywords */}
+              {/* Own ranking per keyword */}
               <div className="rounded-xl border border-black/10 p-4 bg-zinc-50/50 space-y-3">
                 <div className="text-xs font-bold uppercase tracking-wider text-zinc-500 flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 text-emerald-800 font-mono font-bold"><TrendingUp className="w-4 h-4 text-emerald-600" /> Active Keywords ({activeList.length})</span>
-                  <span className="text-[10px] text-zinc-400 font-mono">Updated Just Now</span>
+                  <span className="flex items-center gap-1.5 text-emerald-800 font-mono font-bold"><TrendingUp className="w-4 h-4 text-emerald-600" /> Your Ranking ({userKws.length} keywords)</span>
+                  <span className="text-[10px] text-zinc-400 font-mono">
+                    {lastChecked ? `Checked ${new Date(lastChecked).toLocaleDateString()}` : "Not checked yet"}
+                  </span>
                 </div>
                 <div className="space-y-2">
-                  {activeList.map((kw, idx) => {
-                    const hash = (kw + biz.name + (biz.city || '')).split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
-                    const rank = (hash % 4) + 1;
+                  {userKws.map((kw, idx) => {
+                    const row = rankingByKeyword.get(kw);
+                    const pos = row?.own_position ?? null;
                     return (
-                      <div key={idx} className="flex items-center justify-between bg-white border border-black/5 rounded-lg px-3 py-2 text-xs">
-                        <span className="font-bold text-zinc-800">{kw}</span>
-                        <span className={`font-mono font-black px-2 py-0.5 rounded text-[11px] ${rank === 1 ? 'bg-emerald-100 text-emerald-800' : rank <= 3 ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'}`}>
-                          Rank #{rank} {rank <= 3 ? '★ Local Pack' : ''}
-                        </span>
+                      <div key={idx} className="flex items-center justify-between bg-white border border-black/5 rounded-lg px-3 py-2 text-xs gap-2">
+                        <span className="font-bold text-zinc-800 truncate">{kw}</span>
+                        {!row ? (
+                          <span className="font-mono font-black px-2 py-0.5 rounded text-[11px] bg-zinc-100 text-zinc-500 shrink-0">Pending first check</span>
+                        ) : pos ? (
+                          <span className={`font-mono font-black px-2 py-0.5 rounded text-[11px] shrink-0 ${pos === 1 ? "bg-emerald-100 text-emerald-800" : pos <= 3 ? "bg-amber-100 text-amber-800" : "bg-blue-100 text-blue-800"}`}>
+                            #{pos} {pos <= 3 ? "★ Local Pack" : ""}
+                          </span>
+                        ) : (
+                          <span className="font-mono font-black px-2 py-0.5 rounded text-[11px] bg-orange-100 text-orange-800 shrink-0">Not in top 20</span>
+                        )}
                       </div>
                     );
                   })}
                 </div>
               </div>
 
-              {/* High Impact Keyword Suggestions */}
+              {/* Who's winning each keyword */}
               <div className="rounded-xl border border-black/10 p-4 bg-zinc-50/50 space-y-3">
                 <div className="text-xs font-bold uppercase tracking-wider text-zinc-500 flex items-center gap-1.5 font-mono">
-                  <Sparkles className="w-4 h-4 text-amber-500" /> Recommended Keywords to Target
+                  <Trophy className="w-4 h-4 text-amber-500" /> Who's Ranking #1 (Competitors)
                 </div>
                 <div className="space-y-2">
-                  {[
-                    { kw: `Famous ${biz.business_type || 'shop'} in ${biz.city || 'Rajkot'}`, impact: "+24% GMB Rank" },
-                    { kw: `Affordable ${biz.business_type || 'service'} near me`, impact: "+18% Calls" },
-                    { kw: `Top 10 ${biz.business_type || 'places'} ${biz.city || ''}`, impact: "+30% Searches" },
-                    { kw: `Best rated ${biz.business_type || 'store'} in ${biz.city || 'area'}`, impact: "+15% Trust" },
-                  ].map((item, idx) => (
-                    <div key={idx} className="flex items-center justify-between bg-white border border-black/5 rounded-lg px-3 py-2 text-xs">
-                      <span className="font-medium text-zinc-700">{item.kw}</span>
-                      <span className="font-bold font-mono text-[10px] bg-purple-100 text-purple-800 px-2 py-0.5 rounded">
-                        {item.impact}
-                      </span>
-                    </div>
-                  ))}
+                  {userKws.map((kw, idx) => {
+                    const row = rankingByKeyword.get(kw);
+                    const top = (row?.top_results as { name: string; rating: number | null; position: number }[] | undefined)?.[0];
+                    const bestCompetitor = (row?.competitor_positions as { name: string; position: number | null }[] | undefined)
+                      ?.filter((c) => c.position != null)
+                      .sort((a, b) => (a.position ?? 99) - (b.position ?? 99))[0];
+                    return (
+                      <div key={idx} className="flex items-center justify-between bg-white border border-black/5 rounded-lg px-3 py-2 text-xs gap-2">
+                        <span className="font-medium text-zinc-700 truncate">{kw}</span>
+                        {!row ? (
+                          <span className="text-[10px] text-zinc-400 shrink-0">—</span>
+                        ) : (
+                          <span className="font-bold font-mono text-[10px] bg-purple-100 text-purple-800 px-2 py-0.5 rounded shrink-0 truncate max-w-[140px]" title={top?.name}>
+                            {top ? `#1: ${top.name}` : "No results"}
+                            {bestCompetitor ? ` · tracked comp #${bestCompetitor.position}` : ""}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>

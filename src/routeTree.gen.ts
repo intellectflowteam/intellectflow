@@ -33,6 +33,7 @@ import { Route as AuthenticatedStandeesRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedWhatsappRouteImport } from './routes/_authenticated/whatsapp'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as RSlugRouteImport } from './routes/r.$slug'
+import { Route as ApiPublicKeywordRankCheckRouteImport } from './routes/api/public/keyword-rank-check'
 import { Route as ApiPublicRatingDropAlertRouteImport } from './routes/api/public/rating-drop-alert'
 import { Route as ApiPublicRazorpayWebhookRouteImport } from './routes/api/public/razorpay-webhook'
 import { Route as ApiPublicSubmitReviewRouteImport } from './routes/api/public/submit-review'
@@ -157,6 +158,12 @@ const RSlugRoute = RSlugRouteImport.update({
   path: '/r/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicKeywordRankCheckRoute =
+  ApiPublicKeywordRankCheckRouteImport.update({
+    id: '/api/public/keyword-rank-check',
+    path: '/api/public/keyword-rank-check',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicRatingDropAlertRoute =
   ApiPublicRatingDropAlertRouteImport.update({
     id: '/api/public/rating-drop-alert',
@@ -199,6 +206,7 @@ export interface FileRoutesByFullPath {
   '/whatsapp': typeof AuthenticatedWhatsappRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/r/$slug': typeof RSlugRoute
+  '/api/public/keyword-rank-check': typeof ApiPublicKeywordRankCheckRoute
   '/api/public/rating-drop-alert': typeof ApiPublicRatingDropAlertRoute
   '/api/public/razorpay-webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/public/submit-review': typeof ApiPublicSubmitReviewRoute
@@ -227,6 +235,7 @@ export interface FileRoutesByTo {
   '/whatsapp': typeof AuthenticatedWhatsappRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/r/$slug': typeof RSlugRoute
+  '/api/public/keyword-rank-check': typeof ApiPublicKeywordRankCheckRoute
   '/api/public/rating-drop-alert': typeof ApiPublicRatingDropAlertRoute
   '/api/public/razorpay-webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/public/submit-review': typeof ApiPublicSubmitReviewRoute
@@ -257,6 +266,7 @@ export interface FileRoutesById {
   '/_authenticated/whatsapp': typeof AuthenticatedWhatsappRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/r/$slug': typeof RSlugRoute
+  '/api/public/keyword-rank-check': typeof ApiPublicKeywordRankCheckRoute
   '/api/public/rating-drop-alert': typeof ApiPublicRatingDropAlertRoute
   '/api/public/razorpay-webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/public/submit-review': typeof ApiPublicSubmitReviewRoute
@@ -287,6 +297,7 @@ export interface FileRouteTypes {
     | '/whatsapp'
     | '/auth/callback'
     | '/r/$slug'
+    | '/api/public/keyword-rank-check'
     | '/api/public/rating-drop-alert'
     | '/api/public/razorpay-webhook'
     | '/api/public/submit-review'
@@ -315,6 +326,7 @@ export interface FileRouteTypes {
     | '/whatsapp'
     | '/auth/callback'
     | '/r/$slug'
+    | '/api/public/keyword-rank-check'
     | '/api/public/rating-drop-alert'
     | '/api/public/razorpay-webhook'
     | '/api/public/submit-review'
@@ -344,6 +356,7 @@ export interface FileRouteTypes {
     | '/_authenticated/whatsapp'
     | '/auth/callback'
     | '/r/$slug'
+    | '/api/public/keyword-rank-check'
     | '/api/public/rating-drop-alert'
     | '/api/public/razorpay-webhook'
     | '/api/public/submit-review'
@@ -361,6 +374,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   TermsOfServiceRoute: typeof TermsOfServiceRoute
   RSlugRoute: typeof RSlugRoute
+  ApiPublicKeywordRankCheckRoute: typeof ApiPublicKeywordRankCheckRoute
   ApiPublicRatingDropAlertRoute: typeof ApiPublicRatingDropAlertRoute
   ApiPublicRazorpayWebhookRoute: typeof ApiPublicRazorpayWebhookRoute
   ApiPublicSubmitReviewRoute: typeof ApiPublicSubmitReviewRoute
@@ -536,6 +550,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/keyword-rank-check': {
+      id: '/api/public/keyword-rank-check'
+      path: '/api/public/keyword-rank-check'
+      fullPath: '/api/public/keyword-rank-check'
+      preLoaderRoute: typeof ApiPublicKeywordRankCheckRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/rating-drop-alert': {
       id: '/api/public/rating-drop-alert'
       path: '/api/public/rating-drop-alert'
@@ -615,6 +636,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   TermsOfServiceRoute: TermsOfServiceRoute,
   RSlugRoute: RSlugRoute,
+  ApiPublicKeywordRankCheckRoute: ApiPublicKeywordRankCheckRoute,
   ApiPublicRatingDropAlertRoute: ApiPublicRatingDropAlertRoute,
   ApiPublicRazorpayWebhookRoute: ApiPublicRazorpayWebhookRoute,
   ApiPublicSubmitReviewRoute: ApiPublicSubmitReviewRoute,

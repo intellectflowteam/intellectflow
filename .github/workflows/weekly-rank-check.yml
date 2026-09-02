@@ -1,0 +1,23 @@
+name: Weekly keyword rank check
+
+on:
+  schedule:
+    # Every Monday at 03:00 UTC (~08:30 IST)
+    - cron: "0 3 * * 1"
+  workflow_dispatch: {} # allows manually running it from the Actions tab too
+
+jobs:
+  rank-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call keyword-rank-check endpoint
+        run: |
+          status=$(curl -s -o response.json -w "%{http_code}" -X POST \
+            -H "x-cron-key: ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/public/keyword-rank-check")
+          echo "HTTP status: $status"
+          cat response.json
+          if [ "$status" -ge 300 ]; then
+            echo "Rank check failed"
+            exit 1
+          fi

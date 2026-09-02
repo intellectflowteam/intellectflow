@@ -77,11 +77,13 @@ export type Database = {
           phone: string | null
           photo_url: string | null
           place_id: string | null
+          preferred_language: string | null
           qr_url: string | null
           rating: number | null
           slug: string
           swot_generated_at: string | null
           swot_summary: Json | null
+          target_keywords: string | null
           total_reviews: number | null
           total_scans: number | null
           user_id: string
@@ -101,11 +103,13 @@ export type Database = {
           phone?: string | null
           photo_url?: string | null
           place_id?: string | null
+          preferred_language?: string | null
           qr_url?: string | null
           rating?: number | null
           slug: string
           swot_generated_at?: string | null
           swot_summary?: Json | null
+          target_keywords?: string | null
           total_reviews?: number | null
           total_scans?: number | null
           user_id: string
@@ -125,11 +129,13 @@ export type Database = {
           phone?: string | null
           photo_url?: string | null
           place_id?: string | null
+          preferred_language?: string | null
           qr_url?: string | null
           rating?: number | null
           slug?: string
           swot_generated_at?: string | null
           swot_summary?: Json | null
+          target_keywords?: string | null
           total_reviews?: number | null
           total_scans?: number | null
           user_id?: string
@@ -189,6 +195,51 @@ export type Database = {
           },
           {
             foreignKeyName: "competitors_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      keyword_rankings: {
+        Row: {
+          business_id: string
+          checked_at: string
+          competitor_positions: Json
+          id: string
+          keyword: string
+          own_position: number | null
+          top_results: Json
+        }
+        Insert: {
+          business_id: string
+          checked_at?: string
+          competitor_positions?: Json
+          id?: string
+          keyword: string
+          own_position?: number | null
+          top_results?: Json
+        }
+        Update: {
+          business_id?: string
+          checked_at?: string
+          competitor_positions?: Json
+          id?: string
+          keyword?: string
+          own_position?: number | null
+          top_results?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "keyword_rankings_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "keyword_rankings_business_id_fkey"
             columns: ["business_id"]
             isOneToOne: false
             referencedRelation: "businesses_public"

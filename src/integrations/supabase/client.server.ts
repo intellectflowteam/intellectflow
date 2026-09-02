@@ -44,12 +44,15 @@ function getValidAdminSupabaseUrl(): string {
 }
 
 function getValidAdminSupabaseKey(): string {
-  const DEFAULT_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx0dnprc21icmZuemN5Y2tuYnFqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NzM2NDU5MiwiZXhwIjoyMTAyOTQwNTkyfQ.X_OrglyFwPLu4KxguJhIYj4AJI6H92E7psE1tSLe9TI";
   const candidate = typeof process !== "undefined" ? process.env['SUPABASE_SERVICE_ROLE_KEY'] : undefined;
   if (candidate && typeof candidate === "string" && candidate.trim().length > 10) {
     return candidate.trim();
   }
-  return DEFAULT_KEY;
+  throw new Error(
+    "SUPABASE_SERVICE_ROLE_KEY is not set. This must come from your server environment only — " +
+      "never hardcode it in source, since it bypasses every RLS policy in the database. " +
+      "Find it in Supabase Dashboard → Project Settings → API → service_role secret.",
+  );
 }
 
 function createSupabaseAdminClient() {
