@@ -1,7 +1,7 @@
 import { createFileRoute, Outlet, redirect, Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
-import { LayoutDashboard, MessageSquare, Sparkles, TrendingUp, MessageCircle, Users, Image, QrCode, Settings, CreditCard, Shield, LogOut, Menu, X, HelpCircle } from "lucide-react";
+import { LayoutDashboard, MessageSquare, Sparkles, TrendingUp, MessageCircle, Users, Image, QrCode, Settings, CreditCard, Shield, LogOut, Menu, X, HelpCircle, Search } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
 import { useEffect, useState } from "react";
 
@@ -21,6 +21,7 @@ export const Route = createFileRoute("/_authenticated")({
 
 const nav = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/business-search", label: "Business Search", icon: Search },
   { to: "/reviews", label: "Reviews", icon: MessageSquare },
   { to: "/ai-reply", label: "AI Reply", icon: Sparkles },
   { to: "/gmb", label: "GMB Posts", icon: TrendingUp },

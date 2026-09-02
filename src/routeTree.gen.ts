@@ -22,6 +22,7 @@ import { Route as TermsOfServiceRouteImport } from './routes/terms-of-service'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedAiReplyRouteImport } from './routes/_authenticated/ai-reply'
 import { Route as AuthenticatedBillingRouteImport } from './routes/_authenticated/billing'
+import { Route as AuthenticatedBusinessSearchRouteImport } from './routes/_authenticated/business-search'
 import { Route as AuthenticatedCompetitorsRouteImport } from './routes/_authenticated/competitors'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedFaqRouteImport } from './routes/_authenticated/faq'
@@ -102,6 +103,12 @@ const AuthenticatedBillingRoute = AuthenticatedBillingRouteImport.update({
   path: '/billing',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedBusinessSearchRoute =
+  AuthenticatedBusinessSearchRouteImport.update({
+    id: '/business-search',
+    path: '/business-search',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedCompetitorsRoute =
   AuthenticatedCompetitorsRouteImport.update({
     id: '/competitors',
@@ -195,6 +202,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AuthenticatedAdminRoute
   '/ai-reply': typeof AuthenticatedAiReplyRoute
   '/billing': typeof AuthenticatedBillingRoute
+  '/business-search': typeof AuthenticatedBusinessSearchRoute
   '/competitors': typeof AuthenticatedCompetitorsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/faq': typeof AuthenticatedFaqRoute
@@ -224,6 +232,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AuthenticatedAdminRoute
   '/ai-reply': typeof AuthenticatedAiReplyRoute
   '/billing': typeof AuthenticatedBillingRoute
+  '/business-search': typeof AuthenticatedBusinessSearchRoute
   '/competitors': typeof AuthenticatedCompetitorsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/faq': typeof AuthenticatedFaqRoute
@@ -255,6 +264,7 @@ export interface FileRoutesById {
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/ai-reply': typeof AuthenticatedAiReplyRoute
   '/_authenticated/billing': typeof AuthenticatedBillingRoute
+  '/_authenticated/business-search': typeof AuthenticatedBusinessSearchRoute
   '/_authenticated/competitors': typeof AuthenticatedCompetitorsRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/faq': typeof AuthenticatedFaqRoute
@@ -286,6 +296,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/ai-reply'
     | '/billing'
+    | '/business-search'
     | '/competitors'
     | '/dashboard'
     | '/faq'
@@ -315,6 +326,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/ai-reply'
     | '/billing'
+    | '/business-search'
     | '/competitors'
     | '/dashboard'
     | '/faq'
@@ -345,6 +357,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin'
     | '/_authenticated/ai-reply'
     | '/_authenticated/billing'
+    | '/_authenticated/business-search'
     | '/_authenticated/competitors'
     | '/_authenticated/dashboard'
     | '/_authenticated/faq'
@@ -473,6 +486,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedBillingRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/business-search': {
+      id: '/_authenticated/business-search'
+      path: '/business-search'
+      fullPath: '/business-search'
+      preLoaderRoute: typeof AuthenticatedBusinessSearchRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/competitors': {
       id: '/_authenticated/competitors'
       path: '/competitors'
@@ -585,6 +605,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedAiReplyRoute: typeof AuthenticatedAiReplyRoute
   AuthenticatedBillingRoute: typeof AuthenticatedBillingRoute
+  AuthenticatedBusinessSearchRoute: typeof AuthenticatedBusinessSearchRoute
   AuthenticatedCompetitorsRoute: typeof AuthenticatedCompetitorsRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedFaqRoute: typeof AuthenticatedFaqRoute
@@ -600,6 +621,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedAiReplyRoute: AuthenticatedAiReplyRoute,
   AuthenticatedBillingRoute: AuthenticatedBillingRoute,
+  AuthenticatedBusinessSearchRoute: AuthenticatedBusinessSearchRoute,
   AuthenticatedCompetitorsRoute: AuthenticatedCompetitorsRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedFaqRoute: AuthenticatedFaqRoute,
