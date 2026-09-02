@@ -40,6 +40,7 @@ import {
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
+import { NewBusinessNotifier } from "@/components/NewBusinessNotifier";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({
@@ -230,6 +231,8 @@ function AdminCRM() {
 
   return (
     <div className="space-y-6 select-none pb-12">
+      <NewBusinessNotifier />
+
       {/* Top Banner */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-[var(--ink)] via-[#241F1A] to-[#14110E] text-[var(--paper)] p-6 rounded-3xl border border-[var(--brass)]/30 shadow-lg">
         <div>

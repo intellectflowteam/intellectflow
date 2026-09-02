@@ -7,6 +7,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { useRef } from "react";
 import { MessageSquare, Star, QrCode, TrendingUp, Copy, ExternalLink, Crown, Clock, Download, Gauge, Trophy, Reply, AlertTriangle, X, HelpCircle, Image as ImageIcon, MessageCircle, MapPin, Bot, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+import { NewReviewNotifier } from "@/components/NewReviewNotifier";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
@@ -103,7 +104,7 @@ function Dashboard() {
       <div className="ticket-card p-8 text-center">
         <h2 className="font-black text-xl">Finish setting up your business</h2>
         <p className="text-sm text-zinc-500 mt-1">Complete onboarding to see your dashboard.</p>
-        <Link to="/onboarding" className="mt-4 inline-flex h-10 items-center rounded-lg bg-black text-white px-4 text-sm font-bold">Complete setup</Link>
+        <Link to="/onboarding" className="mt-4 inline-flex h-10 items-center rounded-lg bg-gradient-to-br from-[var(--brass)] to-[var(--brass-deep)] text-white px-4 text-sm font-bold">Complete setup</Link>
       </div>
     );
   }
@@ -183,6 +184,8 @@ function Dashboard() {
 
   return (
     <div className="space-y-5">
+      <NewReviewNotifier businessId={biz.id} businessName={biz.name} />
+
       {/* Trial / access banner */}
       {access.lifetimeFree ? (
         <div className="rounded-2xl border-2 border-[#c9a227] bg-[#fdf6ef] p-4 flex items-center gap-3">
@@ -194,12 +197,12 @@ function Dashboard() {
           <div className="flex items-center gap-2 text-sm font-bold text-emerald-900">
             <Clock className="w-4 h-4" /> {access.trialDaysLeft} day{access.trialDaysLeft === 1 ? "" : "s"} left in your free trial — every feature unlocked.
           </div>
-          <Link to="/billing" className="h-9 px-3 rounded-lg bg-black text-white text-xs font-bold grid place-items-center">Choose a plan</Link>
+          <Link to="/billing" className="h-9 px-3 rounded-lg bg-gradient-to-br from-[var(--brass)] to-[var(--brass-deep)] text-white text-xs font-bold grid place-items-center">Choose a plan</Link>
         </div>
       ) : access.expired ? (
         <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4 flex flex-wrap items-center justify-between gap-3">
           <div className="text-sm font-bold text-orange-900">Your free trial has ended. Pick a plan to keep collecting reviews.</div>
-          <Link to="/billing" className="h-9 px-3 rounded-lg bg-black text-white text-xs font-bold grid place-items-center">See plans</Link>
+          <Link to="/billing" className="h-9 px-3 rounded-lg bg-gradient-to-br from-[var(--brass)] to-[var(--brass-deep)] text-white text-xs font-bold grid place-items-center">See plans</Link>
         </div>
       ) : null}
 
@@ -245,7 +248,7 @@ function Dashboard() {
           <div className="inline-flex items-center gap-1 bg-[#fdf6ef] border border-[#c9a227] rounded-full px-2.5 py-1 text-xs font-bold">
             <Star className="w-3.5 h-3.5 fill-[#c9a227] text-[#c9a227]" /> {biz.rating}
           </div>
-          <span className="text-[11px] uppercase font-bold bg-black text-white px-2 py-1 rounded">
+          <span className="text-[11px] uppercase font-bold bg-gradient-to-br from-[var(--brass)] to-[var(--brass-deep)] text-white px-2 py-1 rounded">
             {access.lifetimeFree ? "Lifetime" : PLANS.find((p) => p.id === access.plan)?.label ?? "Starter"}
           </span>
         </div>
@@ -253,13 +256,13 @@ function Dashboard() {
 
       {/* Score cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <ScoreCard icon={Gauge} title="SEO Score" value={seoScore} suffix="/100" hint={seoScore >= 80 ? "Excellent profile health" : seoScore >= 55 ? "Good — a few gaps left" : "Needs attention"} />
-        <ScoreCard icon={Trophy} title="Local Rank Score" value={rankScore} suffix="/100" hint={comps.length ? `#${position} of ${comps.length + 1} tracked nearby` : "Add competitors to benchmark"} />
-        <ScoreCard icon={Reply} title="Response Rate" value={responseRate} suffix="%" hint={`${handled} of ${list.length} reviews handled`} />
+        <ScoreCard icon={Gauge} accent="blue" title="SEO Score" value={seoScore} suffix="/100" hint={seoScore >= 80 ? "Excellent profile health" : seoScore >= 55 ? "Good — a few gaps left" : "Needs attention"} />
+        <ScoreCard icon={Trophy} accent="brass" title="Local Rank Score" value={rankScore} suffix="/100" hint={comps.length ? `#${position} of ${comps.length + 1} tracked nearby` : "Add competitors to benchmark"} />
+        <ScoreCard icon={Reply} accent="emerald" title="Response Rate" value={responseRate} suffix="%" hint={`${handled} of ${list.length} reviews handled`} />
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <ScoreCard icon={MapPin} title="GEO Score" value={geoScore} suffix="/100" hint={geoScore >= 80 ? "Strong local-pack setup" : geoScore >= 50 ? "Decent — tighten a few gaps" : "Weak local signals"} />
-        <ScoreCard icon={Bot} title="AEO Score" value={aeoScore} suffix="/100" hint={aeoScore >= 80 ? "Highly citable by AI answers" : aeoScore >= 50 ? "Getting there — add more FAQs" : "Low AI-answer visibility"} />
+        <ScoreCard icon={MapPin} accent="teal" title="GEO Score" value={geoScore} suffix="/100" hint={geoScore >= 80 ? "Strong local-pack setup" : geoScore >= 50 ? "Decent — tighten a few gaps" : "Weak local signals"} />
+        <ScoreCard icon={Bot} accent="purple" title="AEO Score" value={aeoScore} suffix="/100" hint={aeoScore >= 80 ? "Highly citable by AI answers" : aeoScore >= 50 ? "Getting there — add more FAQs" : "Low AI-answer visibility"} />
       </div>
 
       {/* Stats */}
@@ -283,7 +286,7 @@ function Dashboard() {
             {weeks.map((w) => (
               <div key={w.label} className="flex-1 flex flex-col items-center gap-1">
                 <div className="text-[10px] font-bold text-zinc-500">{w.count}</div>
-                <div className="w-full rounded-t-md bg-black/85" style={{ height: `${Math.max(4, (w.count / maxCount) * 120)}px` }} />
+                <div className="w-full rounded-t-md bg-gradient-to-t from-[var(--brass-deep)] to-[var(--brass)]" style={{ height: `${Math.max(4, (w.count / maxCount) * 120)}px` }} />
                 <div className="text-[10px] text-zinc-400">{w.label}</div>
               </div>
             ))}
@@ -309,7 +312,7 @@ function Dashboard() {
           </div>
           <button
             onClick={() => downloadQr(qrRef.current, `${biz.slug}-qr`)}
-            className="mt-3 w-full h-11 rounded-lg bg-black text-white font-bold text-sm inline-flex items-center justify-center gap-2"
+            className="mt-3 w-full h-11 rounded-lg bg-gradient-to-br from-[var(--brass)] to-[var(--brass-deep)] text-white font-bold text-sm inline-flex items-center justify-center gap-2"
           >
             <Download className="w-4 h-4" /> Download PNG
           </button>
@@ -326,7 +329,7 @@ function Dashboard() {
             </h2>
             <p className="text-xs text-zinc-500">Checked weekly against live Google Search results for your target keywords.</p>
           </div>
-          <Link to="/settings" className="text-xs font-mono font-bold bg-[var(--ink)] text-white px-3 py-1.5 rounded-full hover:brightness-125 transition">
+          <Link to="/settings" className="text-xs font-mono font-bold bg-gradient-to-br from-[var(--brass)] to-[var(--brass-deep)] text-white px-3 py-1.5 rounded-full hover:brightness-110 transition">
             Manage Keywords →
           </Link>
         </div>
@@ -340,7 +343,7 @@ function Dashboard() {
           if (userKws.length === 0) {
             return (
               <div className="rounded-xl border border-dashed border-black/15 p-6 text-center text-sm text-zinc-500">
-                Add target keywords in <Link to="/settings" className="underline font-semibold text-black">Settings</Link> to start tracking your Google ranking for them.
+                Add target keywords in <Link to="/settings" className="underline font-semibold text-[var(--brass-deep)]">Settings</Link> to start tracking your Google ranking for them.
               </div>
             );
           }
@@ -443,7 +446,7 @@ function Dashboard() {
           ))}
         </div>
         {!geoItems.find((i) => i.label.includes("5+ nearby"))?.ok && (
-          <Link to="/competitors" className="mt-3 inline-block text-xs font-bold text-black underline">Auto-fetch nearby competitors →</Link>
+          <Link to="/competitors" className="mt-3 inline-block text-xs font-bold text-[var(--brass-deep)] underline">Auto-fetch nearby competitors →</Link>
         )}
       </div>
 
@@ -462,7 +465,7 @@ function Dashboard() {
           ))}
         </div>
         {(faqCount ?? 0) < 5 && (
-          <Link to="/faq" className="mt-3 inline-block text-xs font-bold text-black underline">Generate more FAQs →</Link>
+          <Link to="/faq" className="mt-3 inline-block text-xs font-bold text-[var(--brass-deep)] underline">Generate more FAQs →</Link>
         )}
       </div>
 
@@ -470,12 +473,12 @@ function Dashboard() {
       <div className="ticket-card">
         <div className="p-4 flex items-center justify-between border-b border-black/5">
           <h2 className="font-black">Recent reviews</h2>
-          <Link to="/reviews" className="text-xs font-bold text-zinc-600 hover:text-black">View all</Link>
+          <Link to="/reviews" className="text-xs font-bold text-zinc-600 hover:text-[var(--brass-deep)]">View all</Link>
         </div>
         <div className="divide-y divide-black/5">
           {list.slice(0, 8).map((r) => (
             <div key={r.id} className="p-4 flex items-start gap-3">
-              <div className="w-9 h-9 rounded-full bg-black text-white grid place-items-center text-xs font-bold shrink-0">
+              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[var(--brass)] to-[var(--brass-deep)] text-white grid place-items-center text-xs font-bold shrink-0">
                 {(r.customer_name || "A").slice(0, 1).toUpperCase()}
               </div>
               <div className="min-w-0 flex-1">
@@ -551,13 +554,22 @@ async function downloadQr(container: HTMLDivElement | null, fileName: string) {
   a.click();
 }
 
-function ScoreCard({ icon: Icon, title, value, suffix, hint }: { icon: React.ElementType; title: string; value: number; suffix: string; hint: string }) {
+const ACCENTS = {
+  brass: { badge: "bg-gradient-to-br from-[var(--brass)] to-[var(--brass-deep)]", bar: "bg-[var(--brass)]" },
+  blue: { badge: "bg-gradient-to-br from-blue-400 to-blue-600", bar: "bg-blue-500" },
+  emerald: { badge: "bg-gradient-to-br from-emerald-400 to-emerald-600", bar: "bg-emerald-500" },
+  teal: { badge: "bg-gradient-to-br from-teal-400 to-teal-600", bar: "bg-teal-500" },
+  purple: { badge: "bg-gradient-to-br from-purple-400 to-purple-600", bar: "bg-purple-500" },
+} as const;
+
+function ScoreCard({ icon: Icon, title, value, suffix, hint, accent = "brass" }: { icon: React.ElementType; title: string; value: number; suffix: string; hint: string; accent?: keyof typeof ACCENTS }) {
   const pct = suffix === "%" ? value : Math.min(100, value);
+  const { badge, bar } = ACCENTS[accent];
   return (
     <div className="ticket-card p-5 shadow-sm">
       <div className="flex items-center justify-between">
         <span className="eyebrow text-zinc-500">{title}</span>
-        <span className="w-8 h-8 rounded-lg bg-[var(--ink)] text-white grid place-items-center shrink-0">
+        <span className={`w-8 h-8 rounded-lg ${badge} text-white grid place-items-center shrink-0`}>
           <Icon className="w-4 h-4" />
         </span>
       </div>
@@ -566,7 +578,7 @@ function ScoreCard({ icon: Icon, title, value, suffix, hint }: { icon: React.Ele
         <span className="text-base font-bold text-zinc-400">{suffix}</span>
       </div>
       <div className="mt-3 h-1.5 rounded-full bg-zinc-100 overflow-hidden">
-        <div className="h-full rounded-full bg-[var(--brass)]" style={{ width: `${pct}%` }} />
+        <div className={`h-full rounded-full ${bar}`} style={{ width: `${pct}%` }} />
       </div>
       <div className="mt-2 text-xs text-zinc-500">{hint}</div>
     </div>

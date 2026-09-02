@@ -454,6 +454,8 @@ export type Database = {
           customer_name: string | null
           customer_phone: string | null
           id: string
+          owner_replied_at: string | null
+          owner_reply: string | null
           rating: number
           review_text: string | null
           sentiment: string | null
@@ -468,6 +470,8 @@ export type Database = {
           customer_name?: string | null
           customer_phone?: string | null
           id?: string
+          owner_replied_at?: string | null
+          owner_reply?: string | null
           rating: number
           review_text?: string | null
           sentiment?: string | null
@@ -482,6 +486,8 @@ export type Database = {
           customer_name?: string | null
           customer_phone?: string | null
           id?: string
+          owner_replied_at?: string | null
+          owner_reply?: string | null
           rating?: number
           review_text?: string | null
           sentiment?: string | null
