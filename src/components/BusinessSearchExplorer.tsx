@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { getPlaceDetails, type PlaceDetails, type PlaceSuggestion } from "@/lib/places.functions";
 import { PlaceSearchInput } from "@/components/PlaceSearchInput";
@@ -34,6 +34,18 @@ export function BusinessSearchExplorer({
   const [details, setDetails] = useState<PlaceDetails | null>(null);
   const [activePhotoIdx, setActivePhotoIdx] = useState(0);
   const [imported, setImported] = useState(false);
+  const autoFetchedRef = useRef(false);
+
+  useEffect(() => {
+    if ((autoFetchPlaceId || autoFetchName) && !details && !loading && !autoFetchedRef.current) {
+      autoFetchedRef.current = true;
+      loadDetails({
+        place_id: autoFetchPlaceId || `place-custom-${encodeURIComponent(autoFetchName || "business")}`,
+        primary: autoFetchName || "My Business",
+        secondary: "",
+      });
+    }
+  }, [autoFetchPlaceId, autoFetchName]);
 
   const loadDetails = async (suggestion: PlaceSuggestion) => {
     setLoading(true);

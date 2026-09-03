@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getMyBusiness } from "@/lib/queries";
 import { getPlaceDetails, searchNearbyCompetitors, type PlaceSuggestion } from "@/lib/places.functions";
 import { PlaceSearchInput } from "@/components/PlaceSearchInput";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Trash2, Star, Loader2, Sparkles, TrendingUp, TrendingDown, Target, ShieldAlert, MapPin, Radar } from "lucide-react";
 import { toast } from "sonner";
 import { competitorSwot } from "@/lib/ai.functions";
@@ -28,11 +28,21 @@ function Comp() {
   const [busy, setBusy] = useState(false);
   const [autoBusy, setAutoBusy] = useState(false);
   const [swotBusy, setSwotBusy] = useState(false);
+  const autoTriggered = useRef(false);
 
   const { data: rows } = useQuery({
     queryKey: ["comp", biz?.id], enabled: !!biz?.id,
     queryFn: async () => (await supabase.from("competitors").select("*").eq("business_id", biz!.id).order("created_at", { ascending: false })).data ?? [],
   });
+
+  useEffect(() => {
+    if (biz && rows !== undefined && !autoBusy && !autoTriggered.current) {
+      if (!rows.length || !(biz as any)?.swot_summary) {
+        autoTriggered.current = true;
+        autoFetch();
+      }
+    }
+  }, [biz, rows]);
 
   const addFromPlace = async (s: PlaceSuggestion) => {
     if (!biz) return;

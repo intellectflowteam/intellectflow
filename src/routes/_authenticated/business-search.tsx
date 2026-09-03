@@ -39,6 +39,8 @@ function BusinessSearchPage() {
       </div>
 
       <BusinessSearchExplorer
+        autoFetchPlaceId={biz?.place_id ?? undefined}
+        autoFetchName={biz?.name}
         onImport={async (importedDetails) => {
           if (!biz?.id) {
             toast.error("No active business connected to import into.");

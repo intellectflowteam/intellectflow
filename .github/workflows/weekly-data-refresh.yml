@@ -1,0 +1,23 @@
+name: Weekly Data & SWOT Refresh
+
+on:
+  schedule:
+    # Every Monday at 03:30 UTC (~09:00 IST)
+    - cron: "30 3 * * 1"
+  workflow_dispatch: {} # Allows manual trigger from GitHub Actions UI
+
+jobs:
+  weekly-refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call weekly-data-refresh endpoint
+        run: |
+          status=$(curl -s -o response.json -w "%{http_code}" -X POST \
+            -H "x-cron-key: ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/public/weekly-data-refresh")
+          echo "HTTP status: $status"
+          cat response.json
+          if [ "$status" -ge 300 ]; then
+            echo "Weekly data refresh failed"
+            exit 1
+          fi

@@ -38,6 +38,7 @@ import { Route as ApiPublicKeywordRankCheckRouteImport } from './routes/api/publ
 import { Route as ApiPublicRatingDropAlertRouteImport } from './routes/api/public/rating-drop-alert'
 import { Route as ApiPublicRazorpayWebhookRouteImport } from './routes/api/public/razorpay-webhook'
 import { Route as ApiPublicSubmitReviewRouteImport } from './routes/api/public/submit-review'
+import { Route as ApiPublicWeeklyDataRefreshRouteImport } from './routes/api/public/weekly-data-refresh'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -188,6 +189,12 @@ const ApiPublicSubmitReviewRoute = ApiPublicSubmitReviewRouteImport.update({
   path: '/api/public/submit-review',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicWeeklyDataRefreshRoute =
+  ApiPublicWeeklyDataRefreshRouteImport.update({
+    id: '/api/public/weekly-data-refresh',
+    path: '/api/public/weekly-data-refresh',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -218,6 +225,7 @@ export interface FileRoutesByFullPath {
   '/api/public/rating-drop-alert': typeof ApiPublicRatingDropAlertRoute
   '/api/public/razorpay-webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/public/submit-review': typeof ApiPublicSubmitReviewRoute
+  '/api/public/weekly-data-refresh': typeof ApiPublicWeeklyDataRefreshRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -248,6 +256,7 @@ export interface FileRoutesByTo {
   '/api/public/rating-drop-alert': typeof ApiPublicRatingDropAlertRoute
   '/api/public/razorpay-webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/public/submit-review': typeof ApiPublicSubmitReviewRoute
+  '/api/public/weekly-data-refresh': typeof ApiPublicWeeklyDataRefreshRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -280,6 +289,7 @@ export interface FileRoutesById {
   '/api/public/rating-drop-alert': typeof ApiPublicRatingDropAlertRoute
   '/api/public/razorpay-webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/public/submit-review': typeof ApiPublicSubmitReviewRoute
+  '/api/public/weekly-data-refresh': typeof ApiPublicWeeklyDataRefreshRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -312,6 +322,7 @@ export interface FileRouteTypes {
     | '/api/public/rating-drop-alert'
     | '/api/public/razorpay-webhook'
     | '/api/public/submit-review'
+    | '/api/public/weekly-data-refresh'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -342,6 +353,7 @@ export interface FileRouteTypes {
     | '/api/public/rating-drop-alert'
     | '/api/public/razorpay-webhook'
     | '/api/public/submit-review'
+    | '/api/public/weekly-data-refresh'
   id:
     | '__root__'
     | '/'
@@ -373,6 +385,7 @@ export interface FileRouteTypes {
     | '/api/public/rating-drop-alert'
     | '/api/public/razorpay-webhook'
     | '/api/public/submit-review'
+    | '/api/public/weekly-data-refresh'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -391,6 +404,7 @@ export interface RootRouteChildren {
   ApiPublicRatingDropAlertRoute: typeof ApiPublicRatingDropAlertRoute
   ApiPublicRazorpayWebhookRoute: typeof ApiPublicRazorpayWebhookRoute
   ApiPublicSubmitReviewRoute: typeof ApiPublicSubmitReviewRoute
+  ApiPublicWeeklyDataRefreshRoute: typeof ApiPublicWeeklyDataRefreshRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -598,6 +612,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicSubmitReviewRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/weekly-data-refresh': {
+      id: '/api/public/weekly-data-refresh'
+      path: '/api/public/weekly-data-refresh'
+      fullPath: '/api/public/weekly-data-refresh'
+      preLoaderRoute: typeof ApiPublicWeeklyDataRefreshRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -662,6 +683,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicRatingDropAlertRoute: ApiPublicRatingDropAlertRoute,
   ApiPublicRazorpayWebhookRoute: ApiPublicRazorpayWebhookRoute,
   ApiPublicSubmitReviewRoute: ApiPublicSubmitReviewRoute,
+  ApiPublicWeeklyDataRefreshRoute: ApiPublicWeeklyDataRefreshRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

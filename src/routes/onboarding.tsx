@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { getPlaceDetails, type PlaceDetails, type PlaceSuggestion } from "@/lib/places.functions";
+import { autoFetchBusinessPipeline } from "@/lib/autofetch.functions";
 import { PlaceSearchInput } from "@/components/PlaceSearchInput";
 import { QRCodeSVG } from "qrcode.react";
 import { Check, ArrowRight, Download, Star } from "lucide-react";
@@ -37,6 +38,7 @@ const PLANS: { id: "starter" | "growth" | "pro"; price: number; market: string; 
 function Onboarding() {
   const nav = useNavigate();
   const details = useServerFn(getPlaceDetails);
+  const autoFetchFn = useServerFn(autoFetchBusinessPipeline);
 
   const [step, setStep] = useState(1);
   const [busy, setBusy] = useState(false);
@@ -116,13 +118,13 @@ function Onboarding() {
         business_name: form.name, phone: form.phone, city: form.city, plan: form.plan, plan_price: price,
       } as any, { onConflict: "id" });
 
-      const { error: bErr } = await supabase.from("businesses").insert({
+      const { data: newBiz, error: bErr } = await supabase.from("businesses").insert({
         user_id: uid, name: form.name, slug: form.slug, gmb_link: form.gmb_link,
         city: form.city, address: form.address, phone: form.phone,
         place_id: form.place_id, photo_url: form.photo_url, website: form.website,
         description: form.description, business_type: form.business_type,
         latitude: form.latitude, longitude: form.longitude,
-      });
+      }).select("id").single();
       if (bErr) {
         console.error("[onboarding] business insert:", bErr);
         if (bErr.code === "23505") throw new Error(`The URL "/r/${form.slug}" is already taken. Choose another.`);
@@ -133,6 +135,15 @@ function Onboarding() {
         user_id: uid, plan: form.plan, price, market_value: PLANS.find((p) => p.id === form.plan)!.market,
       });
       if (sErr) console.warn("[onboarding] subscription insert:", sErr);
+
+      if (newBiz?.id) {
+        try {
+          toast.info("Auto-fetching business search data, competitors, & SWOT analysis...");
+          await autoFetchFn({ data: { businessId: newBiz.id } });
+        } catch (pipelineErr) {
+          console.warn("[onboarding] Auto-fetch pipeline error:", pipelineErr);
+        }
+      }
 
       toast.success("Setup complete!");
       nav({ to: "/dashboard" });
