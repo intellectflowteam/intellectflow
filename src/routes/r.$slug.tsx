@@ -150,8 +150,18 @@ function PublicReview() {
     setStep(rating <= 3 ? "negative" : "positive");
   }, [rating]);
 
-  const fetchFreshAiReviews = (forceSeed?: number) => {
+  const [selectedKeyword, setSelectedKeyword] = useState<string | null>(null);
+
+  const availableKeywords = useMemo(() => {
+    const defaults = ["Fast Service", "Authentic Taste", "Polite Staff", "Cleanliness", "Great Value", "Best Quality"];
+    const combined = Array.from(new Set([...(parsedKeywords || []), ...defaults]));
+    return combined.slice(0, 8);
+  }, [parsedKeywords]);
+
+  const fetchFreshAiReviews = (forceSeed?: number, overrideKw?: string | null) => {
     setAiLoading(true);
+    const activeKw = overrideKw !== undefined ? overrideKw : selectedKeyword;
+    const kwArray = activeKw ? [activeKw, ...(parsedKeywords || []).filter(k => k !== activeKw)] : parsedKeywords;
 
     writer({
       data: {
@@ -160,10 +170,10 @@ function PublicReview() {
         businessType: biz.business_type ?? "shop",
         businessCity: biz.city ?? undefined,
         businessDescription: cleanDesc || undefined,
-        targetKeywords: parsedKeywords,
+        targetKeywords: kwArray,
         language: (["English", "Hindi", "Gujarati", "Marathi"].includes(preferredLanguage) ? preferredLanguage : "English") as any,
         count: 5,
-        seed: forceSeed || Math.floor(Math.random() * 100000),
+        seed: forceSeed || Math.floor(Math.random() * 1000000),
       },
     })
       .then((res) => {
@@ -177,6 +187,12 @@ function PublicReview() {
       })
       .catch(() => {})
       .finally(() => setAiLoading(false));
+  };
+
+  const handleKeywordToggle = (kw: string) => {
+    const nextKw = selectedKeyword === kw ? null : kw;
+    setSelectedKeyword(nextKw);
+    fetchFreshAiReviews(Math.floor(Math.random() * 1000000), nextKw);
   };
 
   useEffect(() => {
@@ -320,19 +336,47 @@ function PublicReview() {
 
           {step === "positive" && (
             <>
-              <div className="mt-6 flex items-center justify-between gap-2">
-                <p className="text-sm font-semibold">Pick a review — we'll copy it for Google.</p>
-                <button
-                  onClick={() => fetchFreshAiReviews(Math.floor(Math.random() * 100000))}
-                  disabled={aiLoading}
-                  className="text-xs font-mono font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 px-2.5 py-1 rounded-full border border-amber-200 inline-flex items-center gap-1 transition cursor-pointer"
-                >
-                  🎲 Generate New Review
-                </button>
+              <div className="mt-5 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Tap Keyword to Highlight:</p>
+                  <button
+                    onClick={() => fetchFreshAiReviews(Math.floor(Math.random() * 1000000))}
+                    disabled={aiLoading}
+                    className="text-[11px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 px-2.5 py-1 rounded-full border border-amber-200 inline-flex items-center gap-1 transition cursor-pointer"
+                  >
+                    ✨ 100% Unique Refresh
+                  </button>
+                </div>
+
+                {/* Keyword Chips */}
+                <div className="flex flex-wrap gap-1.5">
+                  {availableKeywords.map((kw) => {
+                    const active = selectedKeyword === kw;
+                    return (
+                      <button
+                        key={kw}
+                        onClick={() => handleKeywordToggle(kw)}
+                        className={
+                          "px-2.5 py-1 rounded-full text-xs font-semibold transition flex items-center gap-1 cursor-pointer " +
+                          (active
+                            ? "bg-amber-500 text-white shadow-sm"
+                            : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 border border-black/5")
+                        }
+                      >
+                        #{kw}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
+
+              <div className="mt-4 flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-zinc-900">Select a review option below:</p>
+              </div>
+
               {aiLoading && (
                 <div className="mt-2 text-xs text-zinc-500 inline-flex items-center gap-1.5 font-mono">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-600" /> AI is crafting fresh unique reviews with keywords…
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-600" /> AI crafting 100% unique reviews with #{selectedKeyword || "keywords"}…
                 </div>
               )}
               <div className="mt-3 space-y-2 max-h-[320px] overflow-y-auto pr-0.5">

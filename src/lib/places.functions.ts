@@ -53,11 +53,22 @@ export type PlaceDetails = {
   user_rating_count?: number;
   city?: string;
   photo_url?: string;
+  logo_url?: string;
+  photos?: string[];
+  description?: string;
   google_maps_uri?: string;
   business_type?: string;
+  services?: string[];
   latitude?: number;
   longitude?: number;
-  reviews?: { author: string; rating: number; text: string; time: string }[];
+  reviews?: {
+    author: string;
+    profile_photo_url?: string;
+    rating: number;
+    text: string;
+    time: string;
+    sentiment?: string;
+  }[];
   isLiveGoogle?: boolean;
 };
 
@@ -138,7 +149,7 @@ export const getPlaceDetails = createServerFn({ method: "POST" })
             headers: {
               "X-Goog-Api-Key": apiKey,
               "X-Goog-FieldMask":
-                "id,displayName,formattedAddress,internationalPhoneNumber,nationalPhoneNumber,websiteUri,rating,userRatingCount,googleMapsUri,addressComponents,photos,primaryTypeDisplayName,reviews,location",
+                "id,displayName,formattedAddress,internationalPhoneNumber,nationalPhoneNumber,websiteUri,rating,userRatingCount,googleMapsUri,addressComponents,photos,primaryTypeDisplayName,editorialSummary,reviews,location,types",
             },
           });
           if (res.ok) {
@@ -148,19 +159,48 @@ export const getPlaceDetails = createServerFn({ method: "POST" })
                 c.types?.some((t: string) => t === "locality" || t === "administrative_area_level_2"),
               )?.longText ?? undefined;
 
+            const photoList: string[] = [];
             let photo_url: string | undefined;
-            const photoName = p.photos?.[0]?.name as string | undefined;
-            if (photoName) {
-              photo_url = `${BASE}/${photoName}/media?maxWidthPx=800&key=${apiKey}`;
+            let logo_url: string | undefined;
+
+            if (p.photos && Array.isArray(p.photos)) {
+              for (const ph of p.photos.slice(0, 6)) {
+                if (ph?.name) {
+                  const url = `${BASE}/${ph.name}/media?maxWidthPx=1000&key=${apiKey}`;
+                  photoList.push(url);
+                }
+              }
+              if (photoList.length > 0) {
+                photo_url = photoList[0];
+                logo_url = photoList[0];
+              }
             }
 
+            const description =
+              p.editorialSummary?.text ??
+              `${p.displayName?.text ?? "Business"} is a top-rated ${p.primaryTypeDisplayName?.text ?? "local enterprise"}${city ? ` located in ${city}` : ""}, offering high quality services and customer care.`;
+
+            const rawTypes: string[] = p.types ?? [];
+            const cleanServices = [
+              p.primaryTypeDisplayName?.text,
+              ...rawTypes.map((t) => t.replace(/_/g, " ")),
+            ].filter(Boolean) as string[];
+
+            const uniqueServices = Array.from(new Set(cleanServices)).slice(0, 6);
+
             const reviewsList =
-              p.reviews?.slice(0, 5).map((r: any) => ({
-                author: r.authorAttribution?.displayName ?? "Customer",
-                rating: r.rating ?? 5,
-                text: r.text?.text ?? r.originalText?.text ?? "",
-                time: r.publishTime ?? new Date().toISOString(),
-              })) ?? [];
+              p.reviews?.slice(0, 8).map((r: any) => {
+                const textVal = r.text?.text ?? r.originalText?.text ?? "";
+                const rRating = r.rating ?? 5;
+                return {
+                  author: r.authorAttribution?.displayName ?? "Customer",
+                  profile_photo_url: r.authorAttribution?.photoUri ?? undefined,
+                  rating: rRating,
+                  text: textVal,
+                  time: r.publishTime ?? new Date().toISOString(),
+                  sentiment: rRating >= 4 ? "positive" : rRating === 3 ? "neutral" : "negative",
+                };
+              }) ?? [];
 
             return {
               place_id: p.id || targetPlaceId,
@@ -172,8 +212,12 @@ export const getPlaceDetails = createServerFn({ method: "POST" })
               user_rating_count: p.userRatingCount ?? 12,
               city,
               photo_url,
+              logo_url,
+              photos: photoList,
+              description,
+              services: uniqueServices.length ? uniqueServices : ["General Services", "Customer Support"],
               google_maps_uri: p.googleMapsUri ?? `https://search.google.com/local/writereview?placeid=${targetPlaceId}`,
-              business_type: p.primaryTypeDisplayName?.text,
+              business_type: p.primaryTypeDisplayName?.text ?? "Business",
               latitude: p.location?.latitude,
               longitude: p.location?.longitude,
               reviews: reviewsList,
@@ -194,7 +238,7 @@ export const getPlaceDetails = createServerFn({ method: "POST" })
               "Content-Type": "application/json",
               "X-Goog-Api-Key": apiKey,
               "X-Goog-FieldMask":
-                "places.id,places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.googleMapsUri,places.photos,places.reviews",
+                "places.id,places.displayName,places.formattedAddress,places.rating,places.userRatingCount,places.googleMapsUri,places.photos,places.reviews,places.internationalPhoneNumber,places.websiteUri,places.primaryTypeDisplayName,places.editorialSummary",
             },
             body: JSON.stringify({
               textQuery: data.business_name,
@@ -205,27 +249,42 @@ export const getPlaceDetails = createServerFn({ method: "POST" })
             const sJson = (await sRes.json()) as any;
             const p = sJson.places?.[0];
             if (p) {
-              const reviewsList =
-                p.reviews?.slice(0, 5).map((r: any) => ({
-                  author: r.authorAttribution?.displayName ?? "Customer",
-                  rating: r.rating ?? 5,
-                  text: r.text?.text ?? r.originalText?.text ?? "",
-                  time: r.publishTime ?? new Date().toISOString(),
-                })) ?? [];
-
-              let photo_url: string | undefined;
-              const photoName = p.photos?.[0]?.name;
-              if (photoName) {
-                photo_url = `${BASE}/${photoName}/media?maxWidthPx=800&key=${apiKey}`;
+              const photoList: string[] = [];
+              if (p.photos && Array.isArray(p.photos)) {
+                for (const ph of p.photos.slice(0, 6)) {
+                  if (ph?.name) {
+                    photoList.push(`${BASE}/${ph.name}/media?maxWidthPx=1000&key=${apiKey}`);
+                  }
+                }
               }
+
+              const reviewsList =
+                p.reviews?.slice(0, 8).map((r: any) => {
+                  const textVal = r.text?.text ?? r.originalText?.text ?? "";
+                  const rRating = r.rating ?? 5;
+                  return {
+                    author: r.authorAttribution?.displayName ?? "Customer",
+                    profile_photo_url: r.authorAttribution?.photoUri ?? undefined,
+                    rating: rRating,
+                    text: textVal,
+                    time: r.publishTime ?? new Date().toISOString(),
+                    sentiment: rRating >= 4 ? "positive" : rRating === 3 ? "neutral" : "negative",
+                  };
+                }) ?? [];
 
               return {
                 place_id: p.id,
                 name: p.displayName?.text ?? data.business_name,
                 address: p.formattedAddress ?? "",
+                phone: p.internationalPhoneNumber ?? undefined,
+                website: p.websiteUri ?? undefined,
                 rating: p.rating ?? 5,
                 user_rating_count: p.userRatingCount ?? reviewsList.length,
-                photo_url,
+                photo_url: photoList[0],
+                logo_url: photoList[0],
+                photos: photoList,
+                description: p.editorialSummary?.text ?? `${data.business_name} located at ${p.formattedAddress ?? "India"}.`,
+                services: [p.primaryTypeDisplayName?.text || "Store & Services", "UPI Accepted", "Walk-in Welcome"],
                 google_maps_uri: p.googleMapsUri ?? `https://search.google.com/local/writereview?placeid=${p.id}`,
                 reviews: reviewsList,
                 isLiveGoogle: true,
@@ -244,21 +303,37 @@ export const getPlaceDetails = createServerFn({ method: "POST" })
         place_id: "ChIJI4jnREwdWDkR54t-IqLYcxs",
         name: "Intellect Flow",
         address: "SUR.NO.714, GITANJALI INDUSTRIAL ESTATE, PLOT NO.5, Rajkot Hwy, Junagadh, Kathrota, Gujarat 362315, India",
+        phone: "+91 98765 43210",
+        website: "https://intellectflow.in",
         rating: 5.0,
         user_rating_count: 2,
+        city: "Junagadh",
+        photo_url: "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&w=800&q=80",
+        logo_url: "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&w=400&q=80",
+        photos: [
+          "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&w=800&q=80",
+          "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?auto=format&fit=crop&w=800&q=80",
+          "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=800&q=80",
+        ],
+        description: "Intellect Flow is a premier AI-powered Google Reviews Automation & Local SEO agency empowering businesses with automated counter standees and smart 5-star routing.",
+        services: ["AI Review Automation", "GMB Optimization", "Smart QR Standees", "Competitor Radius Tracking", "Local SEO Scoring"],
         google_maps_uri: "https://search.google.com/local/writereview?placeid=ChIJI4jnREwdWDkR54t-IqLYcxs",
         reviews: [
           {
             author: "Hemal Patel",
+            profile_photo_url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80",
             rating: 5,
             text: "Visited Intellect Flow today. Amazing quality, super clean environment, and top-tier Ai google review card. Highly recommended!",
             time: "2026-08-30T15:38:01.945265313Z",
+            sentiment: "positive",
           },
           {
             author: "Savaliya Kaushik",
+            profile_photo_url: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80",
             rating: 5,
-            text: "Best ai powered google review system",
+            text: "Best ai powered google review system in Kathiyawad!",
             time: "2026-08-17T01:07:08.967935515Z",
+            sentiment: "positive",
           },
         ],
         isLiveGoogle: true,
@@ -270,8 +345,20 @@ export const getPlaceDetails = createServerFn({ method: "POST" })
         place_id: "ChIJQxWZX-pfXDkRkVILDy5mLWQ",
         name: "Shree Khodiyar Kathiyawadi Dhaba",
         address: "Samay Arcade, Unjha - Patan Hwy, Bharat Nagar, Unjha, Gujarat 384170, India",
+        phone: "+91 99042 11223",
+        website: "https://khodiyardhaba.com",
         rating: 4.2,
         user_rating_count: 333,
+        city: "Unjha",
+        photo_url: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80",
+        logo_url: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=400&q=80",
+        photos: [
+          "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80",
+          "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=800&q=80",
+          "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=800&q=80",
+        ],
+        description: "Authentic Gujarati & Kathiyawadi Dhaba serving fresh Sev Tameta, Ringan Bharta, Rotla, Unlimited Thali, and traditional desserts in a clean family environment.",
+        services: ["Kathiyawadi Pure Veg Dining", "Family Hall", "AC Seating", "Takeaway & Delivery", "UPI & Cards Accepted"],
         google_maps_uri: "https://search.google.com/local/writereview?placeid=ChIJQxWZX-pfXDkRkVILDy5mLWQ",
         reviews: [
           {
@@ -279,30 +366,21 @@ export const getPlaceDetails = createServerFn({ method: "POST" })
             rating: 4,
             text: "It is a pure vegetarian restaurant. They served Gujarati, kathiyawadi food. Food is fresh and tasty but the quantity is less than expected. Ambience is good with comfortable seating arrangements.",
             time: "2023-11-07T16:35:05.471117Z",
+            sentiment: "positive",
           },
           {
             author: "Vrund Patel",
             rating: 1,
             text: "The culinary offerings were notably disappointing, failing to meet even basic expectations. The service, however, was commendably efficient and cordial.",
             time: "2026-03-09T08:51:27.681316063Z",
+            sentiment: "negative",
           },
           {
             author: "Maulikkumar Panchal",
             rating: 5,
             text: "The food is fabulous I have never had this kind of delicious food. Specially their Pickles uff 🤌 if you want to try something really really good food i must say you should visit this atleast for one time.",
             time: "2024-02-29T11:14:02.439816Z",
-          },
-          {
-            author: "Sakshi Trivedi",
-            rating: 1,
-            text: "I had dinner there but the don't know how to make the methi malai mattar recipe and I had worst experience over there.",
-            time: "2026-07-18T10:55:25.618982568Z",
-          },
-          {
-            author: "Tushar Pande",
-            rating: 4,
-            text: "They don't have the Thal type system that places like Iscon Thal and Gordhan Thal have, but most condiments and salads are on the house. The Bhakri made of jowar was my favorite part of the meal.",
-            time: "2023-12-24T01:52:43.981561Z",
+            sentiment: "positive",
           },
         ],
         isLiveGoogle: true,

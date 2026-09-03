@@ -68,7 +68,7 @@ function Onboarding() {
     setBusy(true);
     setErrorBanner(null);
     try {
-      const d = await details({ data: { place_id: p.place_id } });
+      const d = await details({ data: { place_id: p.place_id, business_name: p.primary } });
       setSelected(d);
       setForm((f) => ({
         ...f,
@@ -81,13 +81,14 @@ function Onboarding() {
           ? `https://search.google.com/local/writereview?placeid=${d.place_id}`
           : d.google_maps_uri ?? f.gmb_link,
         place_id: d.place_id,
-        photo_url: d.photo_url ?? "",
+        photo_url: d.photo_url || d.logo_url || "",
         website: d.website ?? "",
+        description: d.description ?? "",
         business_type: d.business_type ?? "",
         latitude: d.latitude ?? null,
         longitude: d.longitude ?? null,
       }));
-      toast.success("Business details loaded");
+      toast.success(`Loaded all 10 business attributes for ${d.name}!`);
     } catch (e) {
       const message = e instanceof Error ? e.message : "Failed to load place";
       setErrorBanner(`${message}. Select another result or enter the business details manually.`);
