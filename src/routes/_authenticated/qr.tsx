@@ -5,6 +5,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { Copy, Download, ExternalLink, Star } from "lucide-react";
 import { toast } from "sonner";
 import { useRef } from "react";
+import { ReviewPoster } from "@/components/ReviewPoster";
 
 export const Route = createFileRoute("/_authenticated/qr")({
   head: () => ({
@@ -33,13 +34,32 @@ function QR() {
         <p className="text-sm text-zinc-500">Share these with customers. IntellectFlow QR filters happy reviews to Google and negative ones to you privately.</p>
       </div>
 
-      <QrCard
-        title="IntellectFlow smart QR"
-        subtitle="Recommended — routes 5★ to Google, 1–3★ to your inbox"
-        url={captureUrl}
-        badge="Smart"
-        fileSlug={`${biz.slug}-smart-qr`}
-      />
+      <div className="bg-white border border-black/10 rounded-2xl p-6 flex flex-col md:flex-row gap-6 items-center md:items-start">
+        <ReviewPoster
+          businessName={biz.name}
+          logoUrl={biz.photo_url}
+          reviewUrl={captureUrl}
+          fileSlug={`${biz.slug}-smart-qr`}
+        />
+        <div className="flex-1 min-w-0 w-full">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase bg-gradient-to-br from-[var(--brass)] to-[var(--brass-deep)] text-white px-2 py-0.5 rounded">
+              Smart
+            </span>
+            <h3 className="font-bold">IntellectFlow smart QR poster</h3>
+          </div>
+          <p className="text-xs text-zinc-500 mt-0.5">Recommended — routes 5★ to Google, 1–3★ to your inbox. Print this design for your counter or door.</p>
+          <div className="mt-3 flex items-center gap-2">
+            <div className="flex-1 min-w-0 h-11 rounded-lg border border-black/15 px-3 text-sm flex items-center truncate">{captureUrl}</div>
+            <button onClick={() => { navigator.clipboard.writeText(captureUrl); toast.success("Copied"); }} className="h-11 px-3 rounded-lg border border-black/15" aria-label="Copy link">
+              <Copy className="w-4 h-4" />
+            </button>
+          </div>
+          <a href={captureUrl} target="_blank" rel="noreferrer" className="mt-3 inline-flex h-11 px-4 rounded-lg border border-black/15 font-semibold text-sm items-center gap-2">
+            <ExternalLink className="w-4 h-4" /> Open review page
+          </a>
+        </div>
+      </div>
 
       {gmb ? (
         <QrCard
@@ -56,7 +76,7 @@ function QR() {
         </div>
       )}
 
-      <div className="text-xs text-zinc-500">Total scans on IntellectFlow QR: <b className="text-black">{biz.total_scans ?? 0}</b></div>
+      <div className="text-xs text-zinc-500">Total scans on IntellectFlow QR: <b className="text-[var(--ink)]">{biz.total_scans ?? 0}</b></div>
     </div>
   );
 }
@@ -87,7 +107,7 @@ function QrCard({ title, subtitle, url, badge, fileSlug, icon }: { title: string
       </div>
       <div className="flex-1 min-w-0 w-full">
         <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase bg-black text-white px-2 py-0.5 rounded">
+          <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase bg-gradient-to-br from-[var(--brass)] to-[var(--brass-deep)] text-white px-2 py-0.5 rounded">
             {icon}{badge}
           </span>
           <h3 className="font-bold">{title}</h3>
@@ -100,7 +120,7 @@ function QrCard({ title, subtitle, url, badge, fileSlug, icon }: { title: string
           </button>
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
-          <button onClick={downloadPng} className="h-11 px-4 rounded-lg bg-black text-white font-bold text-sm inline-flex items-center gap-2">
+          <button onClick={downloadPng} className="h-11 px-4 rounded-lg bg-gradient-to-br from-[var(--brass)] to-[var(--brass-deep)] text-white font-bold text-sm inline-flex items-center gap-2">
             <Download className="w-4 h-4" /> Download PNG
           </button>
           <a href={url} target="_blank" rel="noreferrer" className="h-11 px-4 rounded-lg border border-black/15 font-semibold text-sm inline-flex items-center gap-2">

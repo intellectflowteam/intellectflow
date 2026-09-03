@@ -133,6 +133,7 @@ function PublicReview() {
   const [countdown, setCountdown] = useState(3);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiItems, setAiItems] = useState<Suggestion[] | null>(null);
+  const [logoFailed, setLogoFailed] = useState(false);
 
   const meta = useMemo(() => parseBusinessMeta(biz), [biz]);
   const parsedKeywords = meta.keywords;
@@ -290,8 +291,17 @@ function PublicReview() {
       <div className="max-w-md mx-auto">
         <div className="bg-white rounded-2xl border border-black/10 shadow-sm p-6">
           <div className="text-center">
-            <div className="w-14 h-14 mx-auto rounded-2xl bg-black text-white grid place-items-center font-black text-lg">
-              {bizName.slice(0, 2).toUpperCase()}
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-[var(--brass)] to-[var(--brass-deep)] text-white grid place-items-center font-black text-lg overflow-hidden">
+              {(biz as any).photo_url && !logoFailed ? (
+                <img
+                  src={(biz as any).photo_url}
+                  alt={bizName}
+                  className="w-full h-full object-cover"
+                  onError={() => setLogoFailed(true)}
+                />
+              ) : (
+                bizName.slice(0, 2).toUpperCase()
+              )}
             </div>
             <h1 className="mt-3 font-black text-2xl">{bizName}</h1>
             <div className="mt-1 flex items-center justify-center gap-1 text-sm text-zinc-500">
@@ -418,7 +428,7 @@ function PublicReview() {
                 className="mt-4 w-full h-14 rounded-xl bg-black text-white font-bold text-base flex items-center justify-center gap-2 shadow-md hover:bg-zinc-800 transition active:scale-95 cursor-pointer text-center"
               >
                 <Copy className="w-5 h-5" />
-                <span>Copy Review & Post on Google 🚀</span>
+                <span>Give Us Review</span>
               </a>
               {!googleLink && <p className="mt-2 text-[11px] text-orange-600 text-center">This business hasn't linked its Google profile yet — your review is saved for the owner.</p>}
               <button onClick={() => { setRating(0); setStep("rate"); }} className="mt-2 w-full h-10 text-sm text-zinc-500">Back</button>
