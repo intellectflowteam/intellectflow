@@ -224,11 +224,16 @@ Return JSON: { "replies": [ {"lang":"Hinglish","text":"..."}, {"lang":"Gujarati"
 Each about 30 words, warm and specific. Incorporate owner's target SEO keywords if relevant: ${kwStr || "quality service, customer satisfaction"}. If rating <= 2, apologize and invite customer to reach out.`;
     const user = `Review (${data.rating} stars): "${data.reviewText}"`;
     const raw = await callAI(system, user);
+    if (!raw.trim()) {
+      throw new Error("AI provider returned no response — check that AI_API_KEY (or GEMINI_API_KEY) is set correctly on the server.");
+    }
     try {
       const cleaned = raw.replace(/^```json\s*|\s*```$/g, "").trim();
-      return JSON.parse(cleaned) as { replies: { lang: string; text: string }[] };
+      const parsed = JSON.parse(cleaned) as { replies: { lang: string; text: string }[] };
+      if (!parsed.replies?.length) throw new Error("empty");
+      return parsed;
     } catch {
-      return { replies: [] };
+      throw new Error("Could not generate a reply — try again in a moment.");
     }
   });
 
@@ -341,16 +346,27 @@ Write a SWOT analysis based on the rating/review-count gap and typical patterns 
 
 Return JSON: { "strengths": ["..."], "weaknesses": ["..."], "opportunities": ["..."], "threats": ["..."] }`;
     const raw = await callAI(system, user);
+    if (!raw.trim()) {
+      throw new Error(
+        "AI provider returned no response — check that AI_API_KEY (or GEMINI_API_KEY) is set correctly on the server.",
+      );
+    }
     try {
       const cleaned = raw.replace(/^```json\s*|\s*```$/g, "").trim();
-      return JSON.parse(cleaned) as {
+      const parsed = JSON.parse(cleaned) as {
         strengths: string[];
         weaknesses: string[];
         opportunities: string[];
         threats: string[];
       };
-    } catch {
-      return { strengths: [], weaknesses: [], opportunities: [], threats: [] };
+      const allEmpty = !parsed.strengths?.length && !parsed.weaknesses?.length && !parsed.opportunities?.length && !parsed.threats?.length;
+      if (allEmpty) {
+        throw new Error("AI returned an empty SWOT analysis — try again.");
+      }
+      return parsed;
+    } catch (err) {
+      if (err instanceof Error && err.message.startsWith("AI returned")) throw err;
+      throw new Error("Could not parse the AI's SWOT response — try again.");
     }
   });
 

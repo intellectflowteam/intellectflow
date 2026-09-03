@@ -238,16 +238,23 @@ function PublicReview() {
     return `https://www.google.com/search?q=${encodeURIComponent((bizName || "business") + " " + (biz.city || ""))}`;
   }, [biz, bizName]);
 
-  const copyAndGoToGoogle = (e?: React.MouseEvent) => {
+  const copyAndGoToGoogle = async (e?: React.MouseEvent) => {
+    e?.preventDefault(); // we control navigation ourselves so it happens strictly after copy + submit are underway
+
     const finalReviewText = text.trim() || (templates[0]?.text ?? `Great experience at ${bizName}! 5 stars.`);
 
-    // 1. Copy review text to clipboard
+    // 1. Copy review text to clipboard — await the modern API first, and
+    // always also run the synchronous execCommand fallback (some mobile
+    // WebViews silently no-op the async Clipboard API).
+    let copied = false;
     try {
       if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(finalReviewText).catch(() => {});
+        await navigator.clipboard.writeText(finalReviewText);
+        copied = true;
       }
-    } catch {}
-
+    } catch {
+      /* fall through to execCommand fallback below */
+    }
     try {
       const ta = document.createElement("textarea");
       ta.value = finalReviewText;
@@ -258,32 +265,39 @@ function PublicReview() {
       document.body.appendChild(ta);
       ta.focus();
       ta.select();
-      document.execCommand("copy");
+      const ok = document.execCommand("copy");
       document.body.removeChild(ta);
-    } catch {}
+      copied = copied || ok;
+    } catch {
+      /* ignore — worst case the customer pastes manually */
+    }
 
-    toast.success("Review copied! Opening Google...");
+    toast.success(copied ? "Review copied! Opening Google…" : "Opening Google…");
 
-    // 2. Submit review in background without blocking navigation
-    fetch("/api/public/submit-review", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        slug: biz.slug,
-        rating: rating || 5,
-        review_text: finalReviewText,
-        customer_name: customerName || null,
-        customer_phone: customerPhone || null,
-        ai_generated: true,
-      }),
-    }).catch(() => {});
+    // 2. Submit the review. `keepalive` keeps this request alive across the
+    // page navigation we're about to trigger — a plain fetch() would
+    // otherwise frequently get cancelled by the browser mid-flight, silently
+    // dropping the review.
+    try {
+      fetch("/api/public/submit-review", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          slug: biz.slug,
+          rating: rating || 5,
+          review_text: finalReviewText,
+          customer_name: customerName || null,
+          customer_phone: customerPhone || null,
+          ai_generated: true,
+        }),
+        keepalive: true,
+      }).catch(() => {});
+    } catch {
+      /* keepalive fetch isn't supported in some very old browsers — best effort only */
+    }
 
-    // 3. Fallback location change if native anchor does not trigger
-    setTimeout(() => {
-      try {
-        window.location.href = googleLink;
-      } catch {}
-    }, 150);
+    // 3. Redirect only now that copy + submit are both underway.
+    window.location.href = googleLink;
   };
 
   return (

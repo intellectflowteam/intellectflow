@@ -1,14 +1,16 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { getMyBusiness, getMyProfile } from "@/lib/queries";
 import { computeAccess, PLANS } from "@/lib/plans";
 import { QRCodeSVG } from "qrcode.react";
-import { useRef } from "react";
-import { MessageSquare, Star, QrCode, TrendingUp, Copy, ExternalLink, Crown, Clock, Download, Gauge, Trophy, Reply, AlertTriangle, X, HelpCircle, Image as ImageIcon, MessageCircle, MapPin, Bot, Sparkles, Globe, Phone, Layers, Info } from "lucide-react";
+import { useRef, useState } from "react";
+import { MessageSquare, Star, QrCode, TrendingUp, Copy, ExternalLink, Crown, Clock, Download, Gauge, Trophy, Reply, AlertTriangle, X, HelpCircle, Image as ImageIcon, MessageCircle, MapPin, Bot, Sparkles, Globe, Phone, Layers, Info, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { NewReviewNotifier } from "@/components/NewReviewNotifier";
 import { parseBusinessMeta, cleanDescription } from "@/lib/utils";
+import { checkMyKeywordRankings } from "@/lib/rankings.functions";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
@@ -86,6 +88,24 @@ function Dashboard() {
   });
 
   const qc = useQueryClient();
+  const checkKeywordsFn = useServerFn(checkMyKeywordRankings);
+  const [checkingKeywordsNow, setCheckingKeywordsNow] = useState(false);
+  const runKeywordCheckNow = async () => {
+    setCheckingKeywordsNow(true);
+    try {
+      const res = await checkKeywordsFn({});
+      if (res.failed > 0 && res.checked === 0) {
+        toast.error(res.lastError || "Rank check failed for all keywords");
+      } else {
+        toast.success(`Checked ${res.checked} keyword${res.checked === 1 ? "" : "s"}${res.failed ? ` (${res.failed} failed)` : ""}`);
+      }
+      qc.invalidateQueries({ queryKey: ["dash-keyword-rankings", biz?.id] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Rank check failed");
+    } finally {
+      setCheckingKeywordsNow(false);
+    }
+  };
   const { data: alerts } = useQuery({
     queryKey: ["dash-alerts", biz?.id],
     enabled: !!biz?.id,
@@ -446,9 +466,18 @@ function Dashboard() {
             </h2>
             <p className="text-xs text-zinc-500">Checked weekly against live Google Search results for your target keywords.</p>
           </div>
-          <Link to="/settings" className="text-xs font-mono font-bold bg-gradient-to-br from-[var(--brass)] to-[var(--brass-deep)] text-white px-3 py-1.5 rounded-full hover:brightness-110 transition">
-            Manage Keywords →
-          </Link>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={runKeywordCheckNow}
+              disabled={checkingKeywordsNow}
+              className="text-xs font-bold border border-black/15 text-zinc-700 px-3 py-1.5 rounded-full hover:bg-zinc-50 transition disabled:opacity-50 inline-flex items-center gap-1.5"
+            >
+              {checkingKeywordsNow ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />} Check Now
+            </button>
+            <Link to="/settings" className="text-xs font-mono font-bold bg-gradient-to-br from-[var(--brass)] to-[var(--brass-deep)] text-white px-3 py-1.5 rounded-full hover:brightness-110 transition">
+              Manage Keywords →
+            </Link>
+          </div>
         </div>
 
         {(() => {
