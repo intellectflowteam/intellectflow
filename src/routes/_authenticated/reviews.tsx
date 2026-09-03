@@ -9,7 +9,6 @@ import { getPlaceDetails } from "@/lib/places.functions";
 import { aiReply } from "@/lib/ai.functions";
 import { parseBusinessMeta } from "@/lib/utils";
 import { PlaceSearchInput } from "@/components/PlaceSearchInput";
-import { BusinessSearchExplorer } from "@/components/BusinessSearchExplorer";
 import { Star, Loader2, RefreshCw, ExternalLink, Sparkles, Copy, Search, MapPin } from "lucide-react";
 
 
@@ -82,12 +81,6 @@ function Reviews() {
           className={"h-8 px-3 rounded-full text-xs font-bold transition " + (tab === "google" ? "bg-black text-white" : "bg-black/5 text-zinc-600 hover:bg-black/10")}
         >
           LIVE GOOGLE REVIEWS
-        </button>
-        <button
-          onClick={() => setTab("search")}
-          className={"h-8 px-3 rounded-full text-xs font-bold transition " + (tab === "search" ? "bg-black text-white" : "bg-black/5 text-zinc-600 hover:bg-black/10")}
-        >
-          🔍 BUSINESS AUTO-FETCH EXPLORE (10 ATTR)
         </button>
         <button
           onClick={() => setTab("collected")}
@@ -195,44 +188,6 @@ function Reviews() {
             </>
           )}
         </div>
-      )}
-
-      {tab === "search" && (
-        <BusinessSearchExplorer
-          onImport={async (importedDetails) => {
-            if (!biz?.id) return;
-            try {
-              const gmbLink =
-                importedDetails.google_maps_uri ||
-                `https://search.google.com/local/writereview?placeid=${importedDetails.place_id}`;
-
-              const { error } = await supabase
-                .from("businesses")
-                .update({
-                  place_id: importedDetails.place_id,
-                  gmb_link: gmbLink,
-                  name: importedDetails.name,
-                  address: importedDetails.address,
-                  phone: importedDetails.phone ?? biz.phone,
-                  website: importedDetails.website ?? biz.website,
-                  description: importedDetails.description ?? biz.description,
-                  photo_url: importedDetails.photo_url || importedDetails.logo_url || biz.photo_url,
-                  business_type: importedDetails.business_type ?? biz.business_type,
-                  rating: importedDetails.rating ?? biz.rating,
-                  total_reviews: importedDetails.user_rating_count ?? biz.total_reviews,
-                } as any)
-                .eq("id", biz.id);
-
-              if (error) throw error;
-              toast.success(`Successfully imported all attributes for ${importedDetails.name}!`);
-              await qc.invalidateQueries({ queryKey: ["biz"] });
-              await qc.invalidateQueries({ queryKey: ["google-reviews"] });
-            } catch (err) {
-              console.error(err);
-              toast.error("Failed to update profile with imported business details.");
-            }
-          }}
-        />
       )}
 
       {tab === "collected" && (

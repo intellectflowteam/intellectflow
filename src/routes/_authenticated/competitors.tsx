@@ -37,7 +37,15 @@ function Comp() {
 
   useEffect(() => {
     if (biz && rows !== undefined && !autoBusy && !autoTriggered.current) {
-      if (!rows.length || !(biz as any)?.swot_summary) {
+      const swotObj = (biz as any)?.swot_summary;
+      const isSwotEmpty =
+        !swotObj ||
+        (!swotObj.strengths?.length &&
+          !swotObj.weaknesses?.length &&
+          !swotObj.opportunities?.length &&
+          !swotObj.threats?.length);
+
+      if (!rows.length || isSwotEmpty) {
         autoTriggered.current = true;
         autoFetch();
       }
