@@ -242,14 +242,30 @@ function PublicReview() {
     e?.preventDefault(); // we control navigation ourselves so it happens strictly after copy + submit are underway
 
     const finalReviewText = text.trim() || (templates[0]?.text ?? `Great experience at ${bizName}! 5 stars.`);
+    let redirected = false;
+    const redirectNow = () => {
+      if (redirected) return;
+      redirected = true;
+      window.location.href = googleLink;
+    };
 
-    // 1. Copy review text to clipboard — await the modern API first, and
-    // always also run the synchronous execCommand fallback (some mobile
-    // WebViews silently no-op the async Clipboard API).
+    // Safety net: some mobile/in-app browsers (WhatsApp, Instagram, some QR
+    // scanner apps) can leave navigator.clipboard.writeText() pending forever
+    // instead of resolving or rejecting, which would otherwise block this
+    // entire handler — and the redirect — indefinitely. No matter what
+    // happens above, force the redirect after 1.2s regardless.
+    const safetyTimer = setTimeout(redirectNow, 1200);
+
+    // 1. Copy review text to clipboard — race the modern API against a short
+    // timeout, and always also run the synchronous execCommand fallback
+    // (some mobile WebViews silently no-op the async Clipboard API).
     let copied = false;
     try {
       if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(finalReviewText);
+        await Promise.race([
+          navigator.clipboard.writeText(finalReviewText),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("clipboard timeout")), 700)),
+        ]);
         copied = true;
       }
     } catch {
@@ -296,8 +312,10 @@ function PublicReview() {
       /* keepalive fetch isn't supported in some very old browsers — best effort only */
     }
 
-    // 3. Redirect only now that copy + submit are both underway.
-    window.location.href = googleLink;
+    // 3. Redirect now that copy + submit are both underway (the safety timer
+    // above already guarantees this happens even if something hung).
+    clearTimeout(safetyTimer);
+    redirectNow();
   };
 
   return (
