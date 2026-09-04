@@ -35,6 +35,23 @@ function Comp() {
     queryFn: async () => (await supabase.from("competitors").select("*").eq("business_id", biz!.id).order("created_at", { ascending: false })).data ?? [],
   });
 
+  const { data: rankRows } = useQuery({
+    queryKey: ["comp-keyword-rankings", biz?.id], enabled: !!biz?.id,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("keyword_rankings")
+        .select("keyword, own_position, competitor_positions, checked_at")
+        .eq("business_id", biz!.id)
+        .order("checked_at", { ascending: false })
+        .limit(100);
+      const latestByKeyword = new Map<string, NonNullable<typeof data>[number]>();
+      for (const row of data ?? []) {
+        if (!latestByKeyword.has(row.keyword)) latestByKeyword.set(row.keyword, row);
+      }
+      return Array.from(latestByKeyword.values());
+    },
+  });
+
   useEffect(() => {
     if (biz && rows !== undefined && !autoBusy && !autoTriggered.current) {
       const swotObj = (biz as any)?.swot_summary;
@@ -96,12 +113,51 @@ function Comp() {
     qc.invalidateQueries({ queryKey: ["comp", biz?.id] });
   };
 
+  // Pulls real Google-ranking + review data to ground the SWOT analysis in
+  // actual numbers rather than generic guesses about the business type.
+  const gatherSwotContext = async (bizId: string) => {
+    const { data: reviewRows } = await supabase
+      .from("reviews")
+      .select("rating, review_text, owner_reply")
+      .eq("business_id", bizId)
+      .order("created_at", { ascending: false })
+      .limit(100);
+
+    const keywordRankings = (rankRows ?? []).map((r) => {
+      const comps = (r.competitor_positions as { name: string; position: number | null }[] | null) ?? [];
+      const best = comps.filter((c) => c.position != null).sort((a, b) => (a.position ?? 99) - (b.position ?? 99))[0];
+      return {
+        keyword: r.keyword,
+        ownPosition: r.own_position,
+        bestCompetitorName: best?.name,
+        bestCompetitorPosition: best?.position ?? null,
+      };
+    });
+
+    const reviews = reviewRows ?? [];
+    const positiveCount = reviews.filter((r) => r.rating >= 4).length;
+    const negativeReviews = reviews.filter((r) => r.rating <= 2 && r.review_text?.trim());
+    const repliedCount = reviews.filter((r) => r.owner_reply?.trim()).length;
+    const reviewInsights = reviews.length
+      ? {
+          totalReviews: reviews.length,
+          positiveCount,
+          negativeCount: negativeReviews.length,
+          sampleNegativeComments: negativeReviews.slice(0, 5).map((r) => r.review_text!.slice(0, 140)),
+          responseRate: Math.round((repliedCount / reviews.length) * 100),
+        }
+      : undefined;
+
+    return { keywordRankings, reviewInsights };
+  };
+
   // Generates the SWOT analysis. Accepts an optional override list so it can
   // be chained immediately after auto-fetch without waiting on query cache.
   const runSwot = async (competitorList: CompRow[]) => {
     if (!biz || !competitorList.length) return;
     setSwotBusy(true);
     try {
+      const { keywordRankings, reviewInsights } = await gatherSwotContext(biz.id);
       const res = await swotFn({
         data: {
           businessName: biz.name,
@@ -114,6 +170,8 @@ function Comp() {
             rating: c.competitor_rating,
             reviewCount: c.competitor_reviews,
           })),
+          keywordRankings: keywordRankings.length ? keywordRankings : undefined,
+          reviewInsights,
         },
       });
       await supabase.from("businesses").update({ swot_summary: res, swot_generated_at: new Date().toISOString() }).eq("id", biz.id);
@@ -257,7 +315,7 @@ function Comp() {
           <button
             onClick={autoFetch}
             disabled={autoBusy || swotBusy || !biz}
-            className="h-10 px-4 rounded-lg bg-black text-white text-sm font-bold inline-flex items-center gap-2 disabled:opacity-60"
+            className="h-10 px-4 rounded-lg bg-gradient-to-br from-[var(--brass)] to-[var(--brass-deep)] text-white text-sm font-bold inline-flex items-center gap-2 disabled:opacity-60"
           >
             {autoBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Radar className="w-4 h-4" />}
             Auto-fetch nearby (2km)
@@ -284,6 +342,52 @@ function Comp() {
         />
         {busy && <div className="mt-2 text-xs text-zinc-500 inline-flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Fetching Google data…</div>}
       </div>
+
+      {(rows ?? []).length > 0 && (
+        <div className="bg-white border border-black/10 rounded-2xl p-4 overflow-x-auto">
+          <h2 className="font-black text-sm uppercase tracking-wide mb-3">You vs Competitors</h2>
+          <table className="w-full text-sm min-w-[420px]">
+            <thead>
+              <tr className="text-left text-[11px] uppercase text-zinc-400 border-b border-black/5">
+                <th className="pb-2 font-bold">Business</th>
+                <th className="pb-2 font-bold text-center">Rating</th>
+                <th className="pb-2 font-bold text-center">Reviews</th>
+                <th className="pb-2 font-bold text-center">Best keyword rank</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-b border-black/5 bg-[var(--brass)]/5">
+                <td className="py-2 font-bold text-[var(--ink)]">{biz?.name} <span className="text-[10px] font-bold text-[var(--brass-deep)] uppercase ml-1">You</span></td>
+                <td className="py-2 text-center">{biz?.rating ?? "—"}★</td>
+                <td className="py-2 text-center">{biz?.total_reviews ?? 0}</td>
+                <td className="py-2 text-center font-bold">
+                  {(() => {
+                    const positions = (rankRows ?? []).map((r) => r.own_position).filter((p): p is number => p != null);
+                    return positions.length ? `#${Math.min(...positions)}` : "—";
+                  })()}
+                </td>
+              </tr>
+              {(rows ?? []).map((c) => {
+                const positions = (rankRows ?? [])
+                  .flatMap((r) => (r.competitor_positions as { competitor_id: string; position: number | null }[] | null) ?? [])
+                  .filter((p) => p.competitor_id === c.id && p.position != null)
+                  .map((p) => p.position as number);
+                return (
+                  <tr key={c.id} className="border-b border-black/5 last:border-0">
+                    <td className="py-2 truncate max-w-[160px]">{c.competitor_name}</td>
+                    <td className="py-2 text-center">{c.competitor_rating ?? "—"}★</td>
+                    <td className="py-2 text-center">{c.competitor_reviews ?? 0}</td>
+                    <td className="py-2 text-center">{positions.length ? `#${Math.min(...positions)}` : "—"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {!(rankRows ?? []).length && (
+            <p className="mt-2 text-[11px] text-zinc-400">Keyword rank column fills in once your weekly rank check has run — see the dashboard's "Check Now" button.</p>
+          )}
+        </div>
+      )}
 
       {swot && (
         <div className="bg-white border border-black/10 rounded-2xl p-4">

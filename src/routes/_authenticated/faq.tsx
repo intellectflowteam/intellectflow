@@ -102,7 +102,7 @@ function Faq() {
           <button
             onClick={generate}
             disabled={busy || !biz}
-            className="h-10 px-4 rounded-lg bg-black text-white text-sm font-bold inline-flex items-center gap-2 disabled:opacity-60"
+            className="h-10 px-4 rounded-lg bg-gradient-to-br from-[var(--brass)] to-[var(--brass-deep)] text-white text-sm font-bold inline-flex items-center gap-2 disabled:opacity-60"
           >
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
             Generate FAQs

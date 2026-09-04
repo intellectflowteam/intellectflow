@@ -49,7 +49,7 @@ function AiReply() {
             {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n} star{n > 1 && "s"}</option>)}
           </select>
         </div>
-        <button onClick={gen} disabled={busy} className="h-11 px-5 rounded-lg bg-black text-white font-bold text-sm disabled:opacity-60 inline-flex items-center gap-2">
+        <button onClick={gen} disabled={busy} className="h-11 px-5 rounded-lg bg-gradient-to-br from-[var(--brass)] to-[var(--brass-deep)] text-white font-bold text-sm disabled:opacity-60 inline-flex items-center gap-2">
           {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />} Generate 3 replies
         </button>
       </div>

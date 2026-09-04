@@ -198,7 +198,13 @@
   text-transform: uppercase;
 }
 
-/* A card shaped like a torn ticket stub — used for testimonials, pricing, tool cards. */
+/* Clean white theme override for the authenticated user panel only — keeps
+   the beige "paper/ticket" aesthetic on public marketing pages untouched. */
+.panel-white .ticket-card {
+  background: #ffffff;
+}
+
+
 @utility ticket-card {
   position: relative;
   border-radius: 22px;

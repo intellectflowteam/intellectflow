@@ -36,7 +36,7 @@ function Standees() {
           <option>A3 Wall Poster</option>
           <option>Acrylic QR Standee</option>
         </select>
-        <button onClick={order} className="h-11 px-5 rounded-lg bg-black text-white font-bold text-sm inline-flex items-center gap-2"><Plus className="w-4 h-4" /> Order standee</button>
+        <button onClick={order} className="h-11 px-5 rounded-lg bg-gradient-to-br from-[var(--brass)] to-[var(--brass-deep)] text-white font-bold text-sm inline-flex items-center gap-2"><Plus className="w-4 h-4" /> Order standee</button>
       </div>
       <div className="bg-white border border-black/10 rounded-2xl divide-y divide-black/5">
         {(rows ?? []).length === 0 && <div className="p-6 text-center text-sm text-zinc-500">No orders yet.</div>}

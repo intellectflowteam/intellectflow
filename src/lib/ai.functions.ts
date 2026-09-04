@@ -326,23 +326,61 @@ export const competitorSwot = createServerFn({ method: "POST" })
         rating: z.number().nullable().optional(),
         reviewCount: z.number().nullable().optional(),
       })).min(1).max(10),
+      // Optional real data to ground the analysis in — when present, the AI
+      // is asked to reference it directly instead of guessing generic
+      // patterns for the business type.
+      keywordRankings: z.array(z.object({
+        keyword: z.string(),
+        ownPosition: z.number().nullable(),
+        bestCompetitorName: z.string().optional(),
+        bestCompetitorPosition: z.number().nullable().optional(),
+      })).optional(),
+      reviewInsights: z.object({
+        totalReviews: z.number(),
+        positiveCount: z.number(), // 4-5★
+        negativeCount: z.number(), // 1-2★
+        sampleNegativeComments: z.array(z.string()).max(5).optional(),
+        sampleNegativeThemes: z.array(z.string()).max(5).optional(),
+        responseRate: z.number().min(0).max(100).optional(), // % of reviews with an owner reply
+      }).optional(),
     }).parse(raw),
   )
   .handler(async ({ data }) => {
-    const system = `You are a local-business growth consultant. Compare a business against its tracked competitors and produce a short SWOT analysis. Return STRICT JSON only, no markdown fences.`;
+    const system = `You are a local-business growth consultant. Compare a business against its tracked competitors and its own real Google ranking/review data, then produce a short, specific SWOT analysis. Return STRICT JSON only, no markdown fences.`;
     const compLines = data.competitors
       .map((c) => `- ${c.name}: ${c.rating ?? "?"}★ (${c.reviewCount ?? "?"} reviews)`)
       .join("\n");
+
+    const keywordLines = (data.keywordRankings ?? [])
+      .map((k) => {
+        const own = k.ownPosition ? `#${k.ownPosition}` : "not in top 20";
+        const comp = k.bestCompetitorPosition ? ` — best competitor (${k.bestCompetitorName}) is #${k.bestCompetitorPosition}` : "";
+        return `- "${k.keyword}": you rank ${own}${comp}`;
+      })
+      .join("\n");
+
+    const ri = data.reviewInsights;
+    const reviewLines = ri
+      ? [
+          `Total reviews: ${ri.totalReviews} (${ri.positiveCount} positive 4-5★, ${ri.negativeCount} negative 1-2★).`,
+          ri.responseRate != null ? `Owner reply rate: ${ri.responseRate}% of reviews.` : "",
+          ri.sampleNegativeThemes?.length ? `Recurring complaint themes: ${ri.sampleNegativeThemes.join(", ")}.` : "",
+          ri.sampleNegativeComments?.length ? `Example negative feedback: ${ri.sampleNegativeComments.map((c) => `"${c}"`).join(" / ")}` : "",
+        ].filter(Boolean).join("\n")
+      : "";
+
     const user = `Business: ${data.businessName} (${data.businessType})${data.businessCity ? ` in ${data.businessCity}` : ""}
 This business: ${data.businessRating ?? "?"}★ (${data.businessReviewCount ?? "?"} reviews)
 
 Tracked competitors:
 ${compLines}
+${keywordLines ? `\nGoogle keyword rankings:\n${keywordLines}` : ""}
+${reviewLines ? `\nReview data:\n${reviewLines}` : ""}
 
-Write a SWOT analysis based on the rating/review-count gap and typical patterns for this business type. Rules:
-- Each of strengths/weaknesses/opportunities/threats: 2-4 short bullet points, max 15 words each.
+Write a SWOT analysis. Rules:
+- Each of strengths/weaknesses/opportunities/threats: 2-4 short bullet points, max 18 words each.
 - Be specific and actionable, not generic filler.
-- Base conclusions on the actual numbers given (e.g. review count gap, rating gap).
+- Prioritize the keyword ranking and review data above if given — cite the actual keyword, position, or complaint theme rather than speaking abstractly. Only fall back to rating/review-count gap reasoning where that data isn't available.
 
 Return JSON: { "strengths": ["..."], "weaknesses": ["..."], "opportunities": ["..."], "threats": ["..."] }`;
     const raw = await callAI(system, user);
@@ -382,19 +420,28 @@ Return JSON: { "strengths": ["..."], "weaknesses": ["..."], "opportunities": [".
     const compReviews = topComp?.reviewCount ?? 50;
     const compRating = topComp?.rating ?? 4.5;
 
+    const worstKw = (data.keywordRankings ?? []).find((k) => !k.ownPosition || (k.bestCompetitorPosition && k.ownPosition > k.bestCompetitorPosition));
+    const bestKw = (data.keywordRankings ?? []).find((k) => k.ownPosition && k.ownPosition <= 3);
+    const topComplaint = data.reviewInsights?.sampleNegativeThemes?.[0];
+
     return {
       strengths: [
         `Strong rating of ${rating.toFixed(1)}★ reflecting high customer trust in ${city}.`,
-        `Established local presence as a premier ${bType}.`,
+        bestKw ? `Ranking #${bestKw.ownPosition} on Google for "${bestKw.keyword}" — strong local visibility.` : `Established local presence as a premier ${bType}.`,
         `Direct customer engagement through AI review management system.`,
       ],
       weaknesses: [
         `Review count gap compared to ${compName} (${compReviews} reviews vs ${reviews} reviews).`,
-        `Need for consistent daily review collection during peak business hours.`,
-      ],
+        worstKw
+          ? `${worstKw.ownPosition ? `Ranking only #${worstKw.ownPosition}` : "Not ranking in the top 20"} for "${worstKw.keyword}"${worstKw.bestCompetitorName ? ` while ${worstKw.bestCompetitorName} ranks #${worstKw.bestCompetitorPosition}` : ""}.`
+          : `Need for consistent daily review collection during peak business hours.`,
+        topComplaint ? `Recurring customer complaints about ${topComplaint}.` : "",
+      ].filter(Boolean),
       opportunities: [
         `Deploy QR Standees & WhatsApp automation to quickly surpass ${compName}'s review volume.`,
-        `Optimize Google Maps profile keywords to rank in top 3 local search results for ${bType} in ${city}.`,
+        worstKw
+          ? `Target "${worstKw.keyword}" specifically — biggest visible gap vs local competitors.`
+          : `Optimize Google Maps profile keywords to rank in top 3 local search results for ${bType} in ${city}.`,
         `Automate instant 5-star review collection from satisfied walk-in customers.`,
       ],
       threats: [

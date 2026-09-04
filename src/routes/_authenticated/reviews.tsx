@@ -78,13 +78,13 @@ function Reviews() {
       <div className="flex items-center gap-2 border-b border-black/10 pb-3 flex-wrap">
         <button
           onClick={() => setTab("google")}
-          className={"h-8 px-3 rounded-full text-xs font-bold transition " + (tab === "google" ? "bg-black text-white" : "bg-black/5 text-zinc-600 hover:bg-black/10")}
+          className={"h-8 px-3 rounded-full text-xs font-bold transition " + (tab === "google" ? "bg-gradient-to-br from-[var(--brass)] to-[var(--brass-deep)] text-white" : "bg-black/5 text-zinc-600 hover:bg-black/10")}
         >
           LIVE GOOGLE REVIEWS
         </button>
         <button
           onClick={() => setTab("collected")}
-          className={"h-8 px-3 rounded-full text-xs font-bold transition " + (tab === "collected" ? "bg-black text-white" : "bg-black/5 text-zinc-600 hover:bg-black/10")}
+          className={"h-8 px-3 rounded-full text-xs font-bold transition " + (tab === "collected" ? "bg-gradient-to-br from-[var(--brass)] to-[var(--brass-deep)] text-white" : "bg-black/5 text-zinc-600 hover:bg-black/10")}
         >
           COLLECTED ({(reviews ?? []).length})
         </button>
@@ -195,7 +195,7 @@ function Reviews() {
           {(reviews ?? []).length === 0 && <div className="p-8 text-center text-sm text-zinc-500">No reviews collected yet.</div>}
           {(reviews ?? []).map((r) => (
             <div key={r.id} className="p-4 flex items-start gap-3">
-              <div className="w-9 h-9 rounded-full bg-black text-white grid place-items-center text-xs font-bold shrink-0">{(r.customer_name || "A").slice(0, 1).toUpperCase()}</div>
+              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[var(--brass)] to-[var(--brass-deep)] text-white grid place-items-center text-xs font-bold shrink-0">{(r.customer_name || "A").slice(0, 1).toUpperCase()}</div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-semibold text-sm">{r.customer_name || "Anonymous"}</span>
@@ -289,7 +289,7 @@ function AiReplyBox({
           <button
             onClick={handleGenerate}
             disabled={busy}
-            className="h-8 px-3 rounded-lg bg-black text-white text-xs font-bold inline-flex items-center gap-1.5 disabled:opacity-60 hover:bg-zinc-800 transition cursor-pointer"
+            className="h-8 px-3 rounded-lg bg-gradient-to-br from-[var(--brass)] to-[var(--brass-deep)] text-white text-xs font-bold inline-flex items-center gap-1.5 disabled:opacity-60 hover:bg-zinc-800 transition cursor-pointer"
           >
             {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 text-yellow-300" />}
             Auto-Generate AI Reply
@@ -333,7 +333,7 @@ function AiReplyBox({
                   </button>
                   <button
                     onClick={() => copyAndOpen(rp.text)}
-                    className="px-2 py-1 rounded bg-black text-white text-[10px] font-bold inline-flex items-center gap-1 hover:bg-zinc-800"
+                    className="px-2 py-1 rounded bg-gradient-to-br from-[var(--brass)] to-[var(--brass-deep)] text-white text-[10px] font-bold inline-flex items-center gap-1 hover:bg-zinc-800"
                   >
                     Copy &amp; Post <ExternalLink className="w-2.5 h-2.5" />
                   </button>

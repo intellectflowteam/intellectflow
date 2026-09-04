@@ -198,9 +198,9 @@ function Gmb() {
         <button
           onClick={generate}
           disabled={busy}
-          className="h-11 px-6 rounded-xl bg-[#18181B] hover:bg-black text-white font-bold text-xs uppercase tracking-wider disabled:opacity-60 inline-flex items-center gap-2 cursor-pointer shadow-xs transition"
+          className="h-11 px-6 rounded-xl bg-gradient-to-br from-[var(--brass)] to-[var(--brass-deep)] text-white font-bold text-xs uppercase tracking-wider disabled:opacity-60 inline-flex items-center gap-2 cursor-pointer shadow-xs transition"
         >
-          {busy ? <Loader2 className="w-4 h-4 animate-spin text-[var(--brass)]" /> : <Sparkles className="w-4 h-4 text-[var(--brass)]" />}
+          {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
           Generate AI Post &amp; Promo Banner
         </button>
 
@@ -255,9 +255,9 @@ function Gmb() {
 
               <button
                 onClick={() => setShowScheduler(!showScheduler)}
-                className="h-10 px-5 rounded-xl bg-[var(--ink)] hover:bg-black text-white text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 transition shadow-xs cursor-pointer"
+                className="h-10 px-5 rounded-xl bg-indigo-700 hover:bg-indigo-800 text-white text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 transition shadow-xs cursor-pointer"
               >
-                <Calendar className="w-3.5 h-3.5 text-[var(--brass)]" /> Auto-Schedule Post
+                <Calendar className="w-3.5 h-3.5" /> Auto-Schedule Post
               </button>
 
               <button

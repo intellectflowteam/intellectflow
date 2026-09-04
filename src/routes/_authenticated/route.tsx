@@ -33,6 +33,15 @@ const nav = [
   { to: "/billing", label: "Billing", icon: CreditCard },
 ];
 
+// Mobile-only bottom tab bar — a focused subset of the full sidebar nav for
+// quick one-thumb access to the most-used pages on small screens.
+const mobileNav = [
+  { to: "/reviews", label: "Reviews", icon: MessageSquare },
+  { to: "/qr", label: "QR", icon: QrCode },
+  { to: "/competitors", label: "Competitor", icon: Users },
+  { to: "/settings", label: "Settings", icon: Settings },
+];
+
 function Shell() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [open, setOpen] = useState(false);
@@ -55,7 +64,7 @@ function Shell() {
   };
 
   return (
-    <div className="min-h-screen flex" style={{ backgroundColor: "#fdf6ef" }}>
+    <div className="min-h-screen flex panel-white" style={{ backgroundColor: "#ffffff" }}>
       {/* Sidebar */}
       <aside className={[
         "fixed md:sticky md:top-0 md:h-screen top-0 left-0 z-40 h-full w-64 bg-white border-r border-black/10 transition-transform",
@@ -110,7 +119,7 @@ function Shell() {
                 onClick={() => setOpen(false)}
                 className={[
                   "flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-semibold transition",
-                  active ? "bg-black text-white" : "text-zinc-700 hover:bg-zinc-100",
+                  active ? "bg-gradient-to-br from-[var(--brass)] to-[var(--brass-deep)] text-white" : "text-zinc-700 hover:bg-zinc-100",
                 ].join(" ")}
               >
                 <n.icon className="w-4 h-4" />
@@ -146,10 +155,30 @@ function Shell() {
           <button onClick={() => setOpen(true)} className="md:hidden p-1"><Menu className="w-5 h-5" /></button>
           <div className="text-sm font-semibold text-zinc-500">IntellectFlow Console</div>
         </header>
-        <main className="p-4 md:p-6 max-w-6xl mx-auto">
+        <main className="p-4 md:p-6 max-w-6xl mx-auto pb-20 md:pb-6">
           <Outlet />
         </main>
       </div>
+
+      {/* Mobile bottom tab bar */}
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-white border-t border-black/10 flex items-stretch h-16 pb-[env(safe-area-inset-bottom)]">
+        {mobileNav.map((n) => {
+          const active = pathname === n.to;
+          return (
+            <Link
+              key={n.to}
+              to={n.to}
+              className={[
+                "flex-1 flex flex-col items-center justify-center gap-0.5 text-[11px] font-semibold transition",
+                active ? "text-[var(--brass-deep)]" : "text-zinc-500",
+              ].join(" ")}
+            >
+              <n.icon className={`w-5 h-5 ${active ? "text-[var(--brass-deep)]" : "text-zinc-400"}`} />
+              {n.label}
+            </Link>
+          );
+        })}
+      </nav>
     </div>
   );
 }
