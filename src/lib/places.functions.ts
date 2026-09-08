@@ -61,6 +61,9 @@ export type PlaceDetails = {
   services?: string[];
   latitude?: number;
   longitude?: number;
+  hasHours?: boolean;
+  photoCount?: number;
+  categories?: string[];
   reviews?: {
     author: string;
     profile_photo_url?: string;
@@ -149,7 +152,7 @@ export const getPlaceDetails = createServerFn({ method: "POST" })
             headers: {
               "X-Goog-Api-Key": apiKey,
               "X-Goog-FieldMask":
-                "id,displayName,formattedAddress,internationalPhoneNumber,nationalPhoneNumber,websiteUri,rating,userRatingCount,googleMapsUri,addressComponents,photos,primaryTypeDisplayName,editorialSummary,reviews,location,types",
+                "id,displayName,formattedAddress,internationalPhoneNumber,nationalPhoneNumber,websiteUri,rating,userRatingCount,googleMapsUri,addressComponents,photos,primaryTypeDisplayName,editorialSummary,reviews,location,types,regularOpeningHours",
             },
           });
           if (res.ok) {
@@ -222,6 +225,9 @@ export const getPlaceDetails = createServerFn({ method: "POST" })
               longitude: p.location?.longitude,
               reviews: reviewsList,
               isLiveGoogle: true,
+              hasHours: Array.isArray(p.regularOpeningHours?.periods) && p.regularOpeningHours.periods.length > 0,
+              photoCount: Array.isArray(p.photos) ? p.photos.length : 0,
+              categories: rawTypes.map((t) => t.replace(/_/g, " ")).slice(0, 8),
             };
           }
         } catch {

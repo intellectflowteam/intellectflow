@@ -6,11 +6,13 @@ import { getMyBusiness, getMyProfile } from "@/lib/queries";
 import { computeAccess, PLANS } from "@/lib/plans";
 import { QRCodeSVG } from "qrcode.react";
 import { useRef, useState } from "react";
-import { MessageSquare, Star, QrCode, TrendingUp, Copy, ExternalLink, Crown, Clock, Download, Gauge, Trophy, Reply, AlertTriangle, X, HelpCircle, Image as ImageIcon, MessageCircle, MapPin, Bot, Sparkles, Globe, Phone, Layers, Info, Loader2 } from "lucide-react";
+import { MessageSquare, Star, QrCode, TrendingUp, Copy, ExternalLink, Crown, Clock, Download, Trophy, Reply, AlertTriangle, X, HelpCircle, Image as ImageIcon, MessageCircle, MapPin, Sparkles, Globe, Phone, Layers, Info, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { NewReviewNotifier } from "@/components/NewReviewNotifier";
 import { parseBusinessMeta, cleanDescription } from "@/lib/utils";
 import { checkMyKeywordRankings } from "@/lib/rankings.functions";
+import { computeSeoHealth } from "@/lib/seo-score";
+import { SeoHealthCard } from "@/components/SeoHealthCard";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
@@ -26,7 +28,7 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
 });
 
-type ReviewRow = { id: string; rating: number; status: string | null; review_text: string | null; customer_name: string | null; ai_generated: boolean | null; created_at: string | null };
+type ReviewRow = { id: string; rating: number; status: string | null; review_text: string | null; customer_name: string | null; ai_generated: boolean | null; created_at: string | null; owner_reply: string | null };
 
 function Dashboard() {
   const { data: biz } = useQuery({ queryKey: ["biz"], queryFn: getMyBusiness });
@@ -39,18 +41,12 @@ function Dashboard() {
     queryFn: async () => {
       const { data } = await supabase
         .from("reviews")
-        .select("id, rating, status, review_text, customer_name, ai_generated, created_at")
+        .select("id, rating, status, review_text, customer_name, ai_generated, created_at, owner_reply")
         .eq("business_id", biz!.id)
         .order("created_at", { ascending: false })
         .limit(500);
       return (data ?? []) as ReviewRow[];
     },
-  });
-
-  const { data: competitors } = useQuery({
-    queryKey: ["dash-competitors", biz?.id],
-    enabled: !!biz?.id,
-    queryFn: async () => (await supabase.from("competitors").select("competitor_name, competitor_rating, competitor_reviews").eq("business_id", biz!.id)).data ?? [],
   });
 
   const { data: keywordRankings } = useQuery({
@@ -123,7 +119,7 @@ function Dashboard() {
   if (!biz) {
     return (
       <div className="ticket-card p-8 text-center">
-        <h2 className="font-black text-xl">Finish setting up your business</h2>
+        <h2 className="font-black text-xl sm:text-2xl tracking-tight">Finish setting up your business</h2>
         <p className="text-sm text-zinc-500 mt-1">Complete onboarding to see your dashboard.</p>
         <Link to="/onboarding" className="mt-4 inline-flex h-10 items-center rounded-lg bg-gradient-to-br from-[var(--brass)] to-[var(--brass-deep)] text-white px-4 text-sm font-bold">Complete setup</Link>
       </div>
@@ -154,57 +150,17 @@ function Dashboard() {
   });
   const avg = (rows: ReviewRow[]) => (rows.length ? rows.reduce((s, r) => s + r.rating, 0) / rows.length : 0);
   const ratingTrend = avg(last30) - avg(prev30);
-  const handled = list.filter((r) => r.status && r.status !== "pending").length;
-  const responseRate = list.length ? Math.round((handled / list.length) * 100) : 0;
 
-  // ---- SEO score ----
-  const seoItems = [
-    { label: "Google Business Profile linked", ok: !!biz.gmb_link, pts: 25 },
-    { label: "Business description added", ok: !!biz.description, pts: 10 },
-    { label: "Phone number on profile", ok: !!biz.phone, pts: 10 },
-    { label: "Address & city complete", ok: !!biz.address && !!biz.city, pts: 10 },
-    { label: "Website linked", ok: !!biz.website, pts: 10 },
-    { label: "Cover photo uploaded", ok: !!biz.photo_url, pts: 5 },
-    { label: "10+ reviews collected", ok: list.length >= 10, pts: 15 },
-    { label: "Rating above 4.0", ok: (biz.rating ?? 0) >= 4, pts: 10 },
-    { label: "Published GMB posts", ok: (gmbCount ?? 0) > 0, pts: 5 },
-  ];
-  const seoScore = seoItems.reduce((s, i) => s + (i.ok ? i.pts : 0), 0);
-
-  // ---- Rank score ----
-  const comps = competitors ?? [];
-  const myPower = (biz.rating ?? 0) * Math.log10((biz.total_reviews ?? list.length) + 10);
-  const powers = comps.map((c) => (c.competitor_rating ?? 0) * Math.log10((c.competitor_reviews ?? 0) + 10));
-  const better = powers.filter((p) => p < myPower).length;
-  const position = powers.filter((p) => p > myPower).length + 1;
-  const rankScore = comps.length ? Math.round((better / comps.length) * 100) : Math.min(100, Math.round(myPower * 18));
-
-  // ---- GEO score (local/geo SEO — how well you're set up to win the local pack) ----
-  const geoItems = [
-    { label: "Exact map location pinned", ok: (biz as any).latitude != null && (biz as any).longitude != null, pts: 15 },
-    { label: "Full address & city set", ok: !!biz.address && !!biz.city, pts: 15 },
-    { label: "Business category set", ok: !!biz.business_type, pts: 10 },
-    { label: "Google Maps link present", ok: !!biz.gmb_link, pts: 15 },
-    { label: "5+ nearby competitors tracked", ok: comps.length >= 5, pts: 15 },
-    { label: "Ranked in local top 3", ok: comps.length > 0 && position <= 3, pts: 20 },
-    { label: "Phone matches Google listing", ok: !!biz.phone && !!biz.place_id, pts: 10 },
-  ];
-  const geoScore = geoItems.reduce((s, i) => s + (i.ok ? i.pts : 0), 0);
-
-  // ---- AEO score (answer-engine optimization — how citable you are to AI chat/voice answers) ----
-  const reviewsWithText = list.filter((r) => (r.review_text ?? "").trim().length > 0).length;
-  const aeoItems = [
-    { label: "5+ published FAQs", ok: (faqCount ?? 0) >= 5, pts: 25 },
-    { label: "Business description written", ok: !!biz.description, pts: 15 },
-    { label: "10+ reviews with written text", ok: reviewsWithText >= 10, pts: 20 },
-    { label: "Response rate 50%+", ok: responseRate >= 50, pts: 15 },
-    { label: "Published GMB posts (fresh content)", ok: (gmbCount ?? 0) > 0, pts: 10 },
-    { label: "Rating 4.0+ (trust threshold)", ok: (biz.rating ?? 0) >= 4, pts: 15 },
-  ];
-  const aeoScore = aeoItems.reduce((s, i) => s + (i.ok ? i.pts : 0), 0);
+  const { score: seoScore, items: seoItems, responseRate } = computeSeoHealth({
+    business: biz,
+    reviews: list,
+    faqCount: faqCount ?? 0,
+    gmbPostCount: gmbCount ?? 0,
+    keywordRankings: keywordRankings ?? undefined,
+  });
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 sm:space-y-6">
       <NewReviewNotifier businessId={biz.id} businessName={biz.name} />
 
       {/* Trial / access banner */}
@@ -277,7 +233,7 @@ function Dashboard() {
 
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h1 className="font-black text-xl md:text-2xl text-zinc-900">{biz.name}</h1>
+                    <h1 className="font-black text-2xl sm:text-3xl md:text-4xl text-zinc-900 tracking-tight">{biz.name}</h1>
                     {biz.business_type && (
                       <span className="px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-900 text-[11px] font-extrabold uppercase">
                         {biz.business_type}
@@ -391,16 +347,8 @@ function Dashboard() {
         );
       })()}
 
-      {/* Score cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <ScoreCard icon={Gauge} accent="blue" title="SEO Score" value={seoScore} suffix="/100" hint={seoScore >= 80 ? "Excellent profile health" : seoScore >= 55 ? "Good — a few gaps left" : "Needs attention"} />
-        <ScoreCard icon={Trophy} accent="brass" title="Local Rank Score" value={rankScore} suffix="/100" hint={comps.length ? `#${position} of ${comps.length + 1} tracked nearby` : "Add competitors to benchmark"} />
-        <ScoreCard icon={Reply} accent="emerald" title="Response Rate" value={responseRate} suffix="%" hint={`${handled} of ${list.length} reviews handled`} />
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <ScoreCard icon={MapPin} accent="teal" title="GEO Score" value={geoScore} suffix="/100" hint={geoScore >= 80 ? "Strong local-pack setup" : geoScore >= 50 ? "Decent — tighten a few gaps" : "Weak local signals"} />
-        <ScoreCard icon={Bot} accent="purple" title="AEO Score" value={aeoScore} suffix="/100" hint={aeoScore >= 80 ? "Highly citable by AI answers" : aeoScore >= 50 ? "Getting there — add more FAQs" : "Low AI-answer visibility"} />
-      </div>
+      {/* SEO Health Score — the one real, consolidated score */}
+      <SeoHealthCard score={seoScore} items={seoItems} />
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -414,7 +362,7 @@ function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         <div className="lg:col-span-2 ticket-card p-5">
           <div className="flex items-center justify-between">
-            <h2 className="font-black">Review volume — last 8 weeks</h2>
+            <h2 className="font-black text-lg sm:text-xl tracking-tight">Review volume — last 8 weeks</h2>
             <span className={"text-xs font-bold px-2 py-1 rounded " + (ratingTrend >= 0 ? "bg-emerald-100 text-emerald-800" : "bg-orange-100 text-orange-800")}>
               Rating trend {ratingTrend >= 0 ? "+" : ""}{ratingTrend.toFixed(2)}
             </span>
@@ -442,7 +390,7 @@ function Dashboard() {
         </div>
 
         <div className="ticket-card p-5">
-          <h2 className="font-black">Your review QR</h2>
+          <h2 className="font-black text-lg sm:text-xl tracking-tight">Your review QR</h2>
           <p className="text-xs text-zinc-500">Print it, stick it, collect reviews.</p>
           <div ref={qrRef} className="mt-4 p-3 bg-white border border-black/10 rounded-xl grid place-items-center">
             <QRCodeSVG value={publicUrl} size={160} />
@@ -461,7 +409,7 @@ function Dashboard() {
       <div className="ticket-card p-5 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h2 className="font-black text-lg inline-flex items-center gap-2 text-[var(--ink)]">
+            <h2 className="font-black text-lg sm:text-xl inline-flex items-center gap-2 text-[var(--ink)] tracking-tight">
               <Sparkles className="w-5 h-5 text-[var(--brass)]" /> GMB Keyword Rank Tracker
             </h2>
             <p className="text-xs text-zinc-500">Checked weekly against live Google Search results for your target keywords.</p>
@@ -562,63 +510,10 @@ function Dashboard() {
         })()}
       </div>
 
-      {/* SEO breakdown */}
-      <div className="ticket-card p-5">
-        <h2 className="font-black">SEO health breakdown</h2>
-        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
-          {seoItems.map((i) => (
-            <div key={i.label} className="flex items-center justify-between rounded-lg border border-black/5 bg-zinc-50 px-3 py-2 text-sm">
-              <span className={i.ok ? "text-zinc-700" : "text-zinc-500"}>{i.label}</span>
-              <span className={"text-[11px] font-bold px-2 py-0.5 rounded " + (i.ok ? "bg-emerald-100 text-emerald-800" : "bg-orange-100 text-orange-800")}>
-                {i.ok ? `+${i.pts}` : `Missing ${i.pts}`}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* GEO breakdown */}
-      <div className="ticket-card p-5">
-        <h2 className="font-black inline-flex items-center gap-2"><MapPin className="w-4 h-4" /> GEO (Local SEO) breakdown</h2>
-        <p className="text-xs text-zinc-500 mt-0.5">What decides whether you show up in the Google local pack / maps near your customers.</p>
-        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
-          {geoItems.map((i) => (
-            <div key={i.label} className="flex items-center justify-between rounded-lg border border-black/5 bg-zinc-50 px-3 py-2 text-sm">
-              <span className={i.ok ? "text-zinc-700" : "text-zinc-500"}>{i.label}</span>
-              <span className={"text-[11px] font-bold px-2 py-0.5 rounded " + (i.ok ? "bg-emerald-100 text-emerald-800" : "bg-orange-100 text-orange-800")}>
-                {i.ok ? `+${i.pts}` : `Missing ${i.pts}`}
-              </span>
-            </div>
-          ))}
-        </div>
-        {!geoItems.find((i) => i.label.includes("5+ nearby"))?.ok && (
-          <Link to="/competitors" className="mt-3 inline-block text-xs font-bold text-[var(--brass-deep)] underline">Auto-fetch nearby competitors →</Link>
-        )}
-      </div>
-
-      {/* AEO breakdown */}
-      <div className="ticket-card p-5">
-        <h2 className="font-black inline-flex items-center gap-2"><Bot className="w-4 h-4" /> AEO (Answer Engine) breakdown</h2>
-        <p className="text-xs text-zinc-500 mt-0.5">What makes AI chat assistants and voice search cite your business when customers ask.</p>
-        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
-          {aeoItems.map((i) => (
-            <div key={i.label} className="flex items-center justify-between rounded-lg border border-black/5 bg-zinc-50 px-3 py-2 text-sm">
-              <span className={i.ok ? "text-zinc-700" : "text-zinc-500"}>{i.label}</span>
-              <span className={"text-[11px] font-bold px-2 py-0.5 rounded " + (i.ok ? "bg-emerald-100 text-emerald-800" : "bg-orange-100 text-orange-800")}>
-                {i.ok ? `+${i.pts}` : `Missing ${i.pts}`}
-              </span>
-            </div>
-          ))}
-        </div>
-        {(faqCount ?? 0) < 5 && (
-          <Link to="/faq" className="mt-3 inline-block text-xs font-bold text-[var(--brass-deep)] underline">Generate more FAQs →</Link>
-        )}
-      </div>
-
       {/* Reviews feed */}
       <div className="ticket-card">
         <div className="p-4 flex items-center justify-between border-b border-black/5">
-          <h2 className="font-black">Recent reviews</h2>
+          <h2 className="font-black text-lg sm:text-xl tracking-tight">Recent reviews</h2>
           <Link to="/reviews" className="text-xs font-bold text-zinc-600 hover:text-[var(--brass-deep)]">View all</Link>
         </div>
         <div className="divide-y divide-black/5">
@@ -700,45 +595,14 @@ async function downloadQr(container: HTMLDivElement | null, fileName: string) {
   a.click();
 }
 
-const ACCENTS = {
-  brass: { badge: "bg-gradient-to-br from-[var(--brass)] to-[var(--brass-deep)]", bar: "bg-[var(--brass)]" },
-  blue: { badge: "bg-gradient-to-br from-blue-400 to-blue-600", bar: "bg-blue-500" },
-  emerald: { badge: "bg-gradient-to-br from-emerald-400 to-emerald-600", bar: "bg-emerald-500" },
-  teal: { badge: "bg-gradient-to-br from-teal-400 to-teal-600", bar: "bg-teal-500" },
-  purple: { badge: "bg-gradient-to-br from-purple-400 to-purple-600", bar: "bg-purple-500" },
-} as const;
-
-function ScoreCard({ icon: Icon, title, value, suffix, hint, accent = "brass" }: { icon: React.ElementType; title: string; value: number; suffix: string; hint: string; accent?: keyof typeof ACCENTS }) {
-  const pct = suffix === "%" ? value : Math.min(100, value);
-  const { badge, bar } = ACCENTS[accent];
-  return (
-    <div className="ticket-card p-5 shadow-sm">
-      <div className="flex items-center justify-between">
-        <span className="eyebrow text-zinc-500">{title}</span>
-        <span className={`w-8 h-8 rounded-lg ${badge} text-white grid place-items-center shrink-0`}>
-          <Icon className="w-4 h-4" />
-        </span>
-      </div>
-      <div className="mt-3 font-mono-brand font-black text-4xl text-[var(--ink)] tracking-tight">
-        {value}
-        <span className="text-base font-bold text-zinc-400">{suffix}</span>
-      </div>
-      <div className="mt-3 h-1.5 rounded-full bg-zinc-100 overflow-hidden">
-        <div className={`h-full rounded-full ${bar}`} style={{ width: `${pct}%` }} />
-      </div>
-      <div className="mt-2 text-xs text-zinc-500">{hint}</div>
-    </div>
-  );
-}
-
 function Stat({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: number }) {
   return (
-    <div className="ticket-card p-4">
+    <div className="ticket-card p-4 sm:p-5">
       <div className="flex items-center justify-between">
-        <span className="text-xs text-zinc-500 font-semibold">{label}</span>
+        <span className="text-xs text-zinc-500 font-bold uppercase tracking-wide">{label}</span>
         <Icon className="w-4 h-4 text-zinc-400" />
       </div>
-      <div className="mt-2 font-mono-brand font-black text-2xl text-[var(--ink)]">{value}</div>
+      <div className="mt-2 font-mono-brand font-black text-3xl text-[var(--ink)] tracking-tight">{value}</div>
     </div>
   );
 }

@@ -119,6 +119,9 @@ export const autoFetchBusinessPipeline = createServerFn({ method: "POST" })
         if (fetchedDetails.google_maps_uri && !currentBiz.gmb_link) {
           updatePayload.gmb_link = fetchedDetails.google_maps_uri;
         }
+        if (fetchedDetails.hasHours != null) updatePayload.has_hours = fetchedDetails.hasHours;
+        if (fetchedDetails.photoCount != null) updatePayload.photo_count = fetchedDetails.photoCount;
+        if (fetchedDetails.categories?.length) updatePayload.gmb_categories = fetchedDetails.categories.join(", ");
 
         if (Object.keys(updatePayload).length > 0) {
           const { data: updated, error: updateErr } = await supabaseAdmin

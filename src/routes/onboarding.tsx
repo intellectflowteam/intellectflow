@@ -53,6 +53,7 @@ function Onboarding() {
     gmb_link: "", slug: "", place_id: "", photo_url: "", website: "",
     description: "", business_type: "",
     latitude: null as number | null, longitude: null as number | null,
+    has_hours: null as boolean | null, photo_count: null as number | null, gmb_categories: "",
     plan: "growth" as "starter" | "growth" | "pro",
   });
 
@@ -89,6 +90,9 @@ function Onboarding() {
         business_type: d.business_type ?? "",
         latitude: d.latitude ?? null,
         longitude: d.longitude ?? null,
+        has_hours: d.hasHours ?? null,
+        photo_count: d.photoCount ?? null,
+        gmb_categories: d.categories?.length ? d.categories.join(", ") : "",
       }));
       toast.success(`Loaded all 10 business attributes for ${d.name}!`);
     } catch (e) {
@@ -124,6 +128,7 @@ function Onboarding() {
         place_id: form.place_id, photo_url: form.photo_url, website: form.website,
         description: form.description, business_type: form.business_type,
         latitude: form.latitude, longitude: form.longitude,
+        has_hours: form.has_hours, photo_count: form.photo_count, gmb_categories: form.gmb_categories || null,
       }).select("id").single();
       if (bErr) {
         console.error("[onboarding] business insert:", bErr);

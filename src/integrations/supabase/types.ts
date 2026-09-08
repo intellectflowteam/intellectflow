@@ -69,12 +69,15 @@ export type Database = {
           city: string | null
           created_at: string | null
           description: string | null
+          gmb_categories: string | null
           gmb_link: string | null
+          has_hours: boolean | null
           id: string
           latitude: number | null
           longitude: number | null
           name: string
           phone: string | null
+          photo_count: number | null
           photo_url: string | null
           place_id: string | null
           preferred_language: string | null
@@ -95,12 +98,15 @@ export type Database = {
           city?: string | null
           created_at?: string | null
           description?: string | null
+          gmb_categories?: string | null
           gmb_link?: string | null
+          has_hours?: boolean | null
           id?: string
           latitude?: number | null
           longitude?: number | null
           name: string
           phone?: string | null
+          photo_count?: number | null
           photo_url?: string | null
           place_id?: string | null
           preferred_language?: string | null
@@ -121,12 +127,15 @@ export type Database = {
           city?: string | null
           created_at?: string | null
           description?: string | null
+          gmb_categories?: string | null
           gmb_link?: string | null
+          has_hours?: boolean | null
           id?: string
           latitude?: number | null
           longitude?: number | null
           name?: string
           phone?: string | null
+          photo_count?: number | null
           photo_url?: string | null
           place_id?: string | null
           preferred_language?: string | null

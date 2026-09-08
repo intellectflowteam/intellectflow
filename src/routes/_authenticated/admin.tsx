@@ -27,13 +27,9 @@ import {
   X,
   Activity,
   Filter,
-  Gauge,
-  Trophy,
-  Bot,
   Download,
   ArrowLeft,
   ChevronRight,
-  MapPin,
   HelpCircle,
   Sparkles,
   Info,
@@ -41,6 +37,8 @@ import {
 import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
 import { NewBusinessNotifier } from "@/components/NewBusinessNotifier";
+import { computeSeoHealth } from "@/lib/seo-score";
+import { SeoHealthCard } from "@/components/SeoHealthCard";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({
@@ -282,7 +280,7 @@ function AdminCRM() {
                   onClick={() => setTab(item.id as any)}
                   className={[
                     "px-3.5 py-2 rounded-xl font-mono text-xs uppercase tracking-wider font-bold transition flex items-center gap-2",
-                    tab === item.id ? "bg-[var(--ink)] text-white shadow-xs" : "text-[var(--ink-60)] hover:bg-white",
+                    tab === item.id ? "bg-gradient-to-br from-[var(--brass)] to-[var(--brass-deep)] text-white shadow-xs" : "text-[var(--ink-60)] hover:bg-white",
                   ].join(" ")}
                 >
                   <Icon className="w-3.5 h-3.5 text-[var(--brass)]" />
@@ -421,7 +419,7 @@ function AdminCRM() {
                             onClick={() => updateProfile(u.id, { is_admin: !u.is_admin })}
                             className={[
                               "px-2.5 py-1 rounded-lg font-mono text-[11px] font-bold transition",
-                              u.is_admin ? "bg-black text-white" : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200",
+                              u.is_admin ? "bg-gradient-to-br from-[var(--brass)] to-[var(--brass-deep)] text-white" : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200",
                             ].join(" ")}
                           >
                             {u.is_admin ? "Admin ✓" : "Make Admin"}
@@ -432,7 +430,7 @@ function AdminCRM() {
                         <td className="p-3">
                           <button
                             onClick={() => setInspectUser(u)}
-                            className="px-3.5 py-1.5 rounded-xl bg-[var(--ink)] text-[var(--paper)] font-mono text-xs font-bold hover:bg-black transition inline-flex items-center gap-1.5 shadow-xs"
+                            className="px-3.5 py-1.5 rounded-xl bg-gradient-to-br from-[var(--brass)] to-[var(--brass-deep)] text-white font-mono text-xs font-bold hover:brightness-110 transition inline-flex items-center gap-1.5 shadow-xs"
                           >
                             <Eye className="w-3.5 h-3.5 text-[var(--brass)]" /> Inspect Dashboard <ChevronRight className="w-3.5 h-3.5" />
                           </button>
@@ -544,10 +542,30 @@ function UserFullDashboardView({
     queryFn: async () => {
       const { data } = await supabase
         .from("reviews")
-        .select("id, rating, status, review_text, customer_name, ai_generated, created_at")
+        .select("id, rating, status, review_text, customer_name, ai_generated, created_at, owner_reply")
         .eq("business_id", b!.id)
         .order("created_at", { ascending: false });
       return data ?? [];
+    },
+  });
+
+  // Real keyword ranking data for this inspected business (used by the real
+  // SEO Health score below — same source as the owner's own dashboard).
+  const { data: userKeywordRankings } = useQuery({
+    queryKey: ["admin-inspect-keyword-rankings", b?.id],
+    enabled: !!b?.id,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("keyword_rankings")
+        .select("keyword, own_position, checked_at")
+        .eq("business_id", b!.id)
+        .order("checked_at", { ascending: false })
+        .limit(100);
+      const latestByKeyword = new Map<string, NonNullable<typeof data>[number]>();
+      for (const row of data ?? []) {
+        if (!latestByKeyword.has(row.keyword)) latestByKeyword.set(row.keyword, row);
+      }
+      return Array.from(latestByKeyword.values());
     },
   });
 
@@ -617,20 +635,15 @@ function UserFullDashboardView({
   const totalReviews = list.length;
   const avgRating30 = list.length ? (list.reduce((s, r) => s + r.rating, 0) / list.length).toFixed(1) : "5.0";
 
-  // SEO Health calculation
-  const checks = [
-    { label: "Google Business Profile linked", points: 25, done: !!b?.place_id, modal: "location" },
-    { label: "Business description added", points: 10, done: !!b?.description, modal: "location" },
-    { label: "Phone number on profile", points: 10, done: !!b?.phone, modal: "location" },
-    { label: "Address & city complete", points: 10, done: !!b?.address && !!b?.city, modal: "location" },
-    { label: "Website linked", points: 10, done: !!b?.website, modal: "location" },
-    { label: "Cover photo uploaded", points: 5, done: !!b?.photo_url, modal: "location" },
-    { label: "10+ reviews collected", points: 10, done: totalReviews >= 10, altMsg: `Missing ${Math.max(0, 10 - totalReviews)}`, modal: "reviews" },
-    { label: "Rating above 4.0", points: 10, done: Number(avgRating30) >= 4.0, modal: "reviews" },
-    { label: "Published GMB posts", points: 10, done: (userGmbPosts?.length ?? 0) > 0, altMsg: (userGmbPosts?.length ?? 0) > 0 ? "Done" : "Missing 5", modal: "gmb" },
-  ];
-
-  const seoScore = checks.reduce((sum, c) => sum + (c.done ? c.points : 0), 0);
+  // Real SEO Health — same computation as the business owner's own dashboard,
+  // no hardcoded/heuristic numbers.
+  const { score: seoScore, items: seoItems } = computeSeoHealth({
+    business: b ?? {},
+    reviews: list,
+    faqCount: userFaqs?.length ?? 0,
+    gmbPostCount: userGmbPosts?.length ?? 0,
+    keywordRankings: userKeywordRankings ?? undefined,
+  });
 
   return (
     <div className="space-y-6 pb-16 font-sans">
@@ -726,127 +739,15 @@ function UserFullDashboardView({
               <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
               {b?.rating ?? "4.8"}
             </span>
-            <span className="bg-[var(--ink)] text-[var(--paper)] text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider shadow-2xs">
+            <span className="bg-gradient-to-br from-[var(--brass)] to-[var(--brass-deep)] text-white text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider shadow-2xs">
               {user.lifetime_free ? "LIFETIME" : user.plan?.toUpperCase() || "STARTER"}
             </span>
           </div>
         </div>
       </div>
 
-      {/* 5 CORE INTERACTIVE DASHBOARD SCORE CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {/* SEO SCORE CARD */}
-        <div
-          onClick={() => setActiveModal("location")}
-          className="ticket-card p-5 bg-white border border-[rgba(20,17,14,0.12)] hover:border-[var(--brass)] rounded-3xl shadow-xs cursor-pointer hover:scale-[1.01] transition group"
-        >
-          <div className="flex items-center justify-between text-xs font-mono font-bold uppercase tracking-wider text-[var(--ink-60)]">
-            <span className="group-hover:text-[var(--brass-deep)] transition flex items-center gap-1">
-              SEO SCORE <ChevronRight className="w-3.5 h-3.5" />
-            </span>
-            <span className="w-8 h-8 rounded-full bg-zinc-900 text-white grid place-items-center"><Gauge className="w-4 h-4" /></span>
-          </div>
-          <div className="mt-3 font-mono font-black text-4xl text-[var(--ink)]">
-            {seoScore}<span className="text-sm font-normal text-[var(--ink-60)]">/100</span>
-          </div>
-          <div className="w-full bg-zinc-100 rounded-full h-2 mt-3 overflow-hidden">
-            <div className="bg-[var(--brass-deep)] h-full rounded-full transition-all" style={{ width: `${seoScore}%` }} />
-          </div>
-          <p className="mt-2.5 text-xs text-[var(--ink-60)] font-medium flex items-center justify-between">
-            <span>Excellent profile health</span>
-            <span className="text-[10px] font-mono font-bold text-blue-600 underline">View Details</span>
-          </p>
-        </div>
-
-        {/* LOCAL RANK SCORE CARD */}
-        <div
-          onClick={() => setActiveModal("competitors")}
-          className="ticket-card p-5 bg-white border border-[rgba(20,17,14,0.12)] hover:border-[var(--brass)] rounded-3xl shadow-xs cursor-pointer hover:scale-[1.01] transition group"
-        >
-          <div className="flex items-center justify-between text-xs font-mono font-bold uppercase tracking-wider text-[var(--ink-60)]">
-            <span className="group-hover:text-[var(--brass-deep)] transition flex items-center gap-1">
-              LOCAL RANK SCORE <ChevronRight className="w-3.5 h-3.5" />
-            </span>
-            <span className="w-8 h-8 rounded-full bg-zinc-900 text-white grid place-items-center"><Trophy className="w-4 h-4" /></span>
-          </div>
-          <div className="mt-3 font-mono font-black text-4xl text-[var(--ink)]">
-            {userCompetitors?.length ? "75" : "0"}<span className="text-sm font-normal text-[var(--ink-60)]">/100</span>
-          </div>
-          <div className="w-full bg-zinc-100 rounded-full h-2 mt-3 overflow-hidden">
-            <div className="bg-[var(--brass-deep)] h-full rounded-full transition-all" style={{ width: userCompetitors?.length ? "75%" : "0%" }} />
-          </div>
-          <p className="mt-2.5 text-xs text-[var(--ink-60)] font-medium flex items-center justify-between">
-            <span>{userCompetitors?.length ? `#1 of ${userCompetitors.length + 1} tracked nearby` : "No tracked competitors nearby"}</span>
-            <span className="text-[10px] font-mono font-bold text-blue-600 underline">View Competitors</span>
-          </p>
-        </div>
-
-        {/* RESPONSE RATE CARD */}
-        <div
-          onClick={() => setActiveModal("reviews")}
-          className="ticket-card p-5 bg-white border border-[rgba(20,17,14,0.12)] hover:border-[var(--brass)] rounded-3xl shadow-xs cursor-pointer hover:scale-[1.01] transition group"
-        >
-          <div className="flex items-center justify-between text-xs font-mono font-bold uppercase tracking-wider text-[var(--ink-60)]">
-            <span className="group-hover:text-[var(--brass-deep)] transition flex items-center gap-1">
-              RESPONSE RATE <ChevronRight className="w-3.5 h-3.5" />
-            </span>
-            <span className="w-8 h-8 rounded-full bg-zinc-900 text-white grid place-items-center"><MessageSquare className="w-4 h-4" /></span>
-          </div>
-          <div className="mt-3 font-mono font-black text-4xl text-[var(--ink)]">100%</div>
-          <div className="w-full bg-zinc-100 rounded-full h-2 mt-3 overflow-hidden">
-            <div className="bg-[var(--brass-deep)] h-full rounded-full transition-all w-full" />
-          </div>
-          <p className="mt-2.5 text-xs text-[var(--ink-60)] font-medium flex items-center justify-between">
-            <span>{totalReviews} of {totalReviews} reviews handled</span>
-            <span className="text-[10px] font-mono font-bold text-blue-600 underline">View Reviews</span>
-          </p>
-        </div>
-      </div>
-
-      {/* SECOND ROW SCORE CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {/* GEO SCORE CARD */}
-        <div
-          onClick={() => setActiveModal("location")}
-          className="ticket-card p-5 bg-white border border-[rgba(20,17,14,0.12)] hover:border-[var(--brass)] rounded-3xl shadow-xs cursor-pointer hover:scale-[1.01] transition group"
-        >
-          <div className="flex items-center justify-between text-xs font-mono font-bold uppercase tracking-wider text-[var(--ink-60)]">
-            <span className="group-hover:text-[var(--brass-deep)] transition flex items-center gap-1">
-              GEO SCORE <ChevronRight className="w-3.5 h-3.5" />
-            </span>
-            <span className="w-8 h-8 rounded-full bg-zinc-900 text-white grid place-items-center"><MapPin className="w-4 h-4" /></span>
-          </div>
-          <div className="mt-3 font-mono font-black text-4xl text-[var(--ink)]">85<span className="text-sm font-normal text-[var(--ink-60)]">/100</span></div>
-          <div className="w-full bg-zinc-100 rounded-full h-2 mt-3 overflow-hidden">
-            <div className="bg-[var(--brass-deep)] h-full rounded-full transition-all w-[85%]" />
-          </div>
-          <p className="mt-2.5 text-xs text-[var(--ink-60)] font-medium flex items-center justify-between">
-            <span>Strong local-pack setup ({b?.city || "Location set"})</span>
-            <span className="text-[10px] font-mono font-bold text-blue-600 underline">View Address</span>
-          </p>
-        </div>
-
-        {/* AEO SCORE CARD */}
-        <div
-          onClick={() => setActiveModal("faqs")}
-          className="ticket-card p-5 bg-white border border-[rgba(20,17,14,0.12)] hover:border-[var(--brass)] rounded-3xl shadow-xs cursor-pointer hover:scale-[1.01] transition group"
-        >
-          <div className="flex items-center justify-between text-xs font-mono font-bold uppercase tracking-wider text-[var(--ink-60)]">
-            <span className="group-hover:text-[var(--brass-deep)] transition flex items-center gap-1">
-              AEO SCORE <ChevronRight className="w-3.5 h-3.5" />
-            </span>
-            <span className="w-8 h-8 rounded-full bg-zinc-900 text-white grid place-items-center"><Bot className="w-4 h-4" /></span>
-          </div>
-          <div className="mt-3 font-mono font-black text-4xl text-[var(--ink)]">70<span className="text-sm font-normal text-[var(--ink-60)]">/100</span></div>
-          <div className="w-full bg-zinc-100 rounded-full h-2 mt-3 overflow-hidden">
-            <div className="bg-[var(--brass-deep)] h-full rounded-full transition-all w-[70%]" />
-          </div>
-          <p className="mt-2.5 text-xs text-[var(--ink-60)] font-medium flex items-center justify-between">
-            <span>{userFaqs?.length ?? 0} FAQs generated for AI Search</span>
-            <span className="text-[10px] font-mono font-bold text-blue-600 underline">View FAQs</span>
-          </p>
-        </div>
-      </div>
+      {/* Real SEO Health Score — same shared component/data as the owner's own dashboard, no hardcoded numbers */}
+      <SeoHealthCard score={seoScore} items={seoItems} />
 
       {/* 4 COUNTER CARDS */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -930,7 +831,7 @@ function UserFullDashboardView({
                   {w.count}
                 </span>
                 <div
-                  className="w-full max-w-[42px] bg-zinc-900 rounded-t-lg transition-all duration-300 min-h-[4px]"
+                  className="w-full max-w-[42px] bg-gradient-to-t from-[var(--brass-deep)] to-[var(--brass)] rounded-t-lg transition-all duration-300 min-h-[4px]"
                   style={{ height: `${Math.max(6, hPct)}%` }}
                 />
                 <span className="text-[10px] font-mono text-[var(--ink-60)] font-bold">{w.label}</span>
@@ -971,42 +872,13 @@ function UserFullDashboardView({
           <div className="space-y-2 max-w-sm mx-auto">
             <button
               onClick={() => setActiveModal("qr")}
-              className="w-full h-11 bg-[var(--ink)] text-[var(--paper)] rounded-xl font-mono text-xs font-bold uppercase tracking-wider inline-flex items-center justify-center gap-2 hover:bg-black transition shadow-xs cursor-pointer"
+              className="w-full h-11 bg-gradient-to-br from-[var(--brass)] to-[var(--brass-deep)] text-white rounded-xl font-mono text-xs font-bold uppercase tracking-wider inline-flex items-center justify-center gap-2 hover:brightness-110 transition shadow-xs cursor-pointer"
             >
               <QrCode className="w-4 h-4 text-[var(--brass)]" /> View QR Options & Standee
             </button>
           </div>
         </div>
       )}
-
-      {/* SEO HEALTH BREAKDOWN CHECKLIST */}
-      <div className="ticket-card p-6 bg-white border border-[rgba(20,17,14,0.12)] rounded-3xl shadow-xs space-y-4">
-        <h3 className="font-display font-bold text-lg text-[var(--ink)]">SEO health breakdown</h3>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-sans">
-          {checks.map((c) => (
-            <div
-              key={c.label}
-              onClick={() => setActiveModal(c.modal as any)}
-              className="p-3.5 rounded-2xl bg-[var(--paper)]/60 border border-black/5 hover:border-[var(--brass)] cursor-pointer transition flex items-center justify-between gap-2 group"
-            >
-              <span className="font-semibold text-[var(--ink)] group-hover:text-[var(--brass-deep)] transition flex items-center gap-1.5">
-                <ChevronRight className="w-3.5 h-3.5 text-zinc-400" />
-                {c.label}
-              </span>
-              {c.done ? (
-                <span className="bg-emerald-100 text-emerald-800 font-mono text-[10px] font-bold px-2 py-0.5 rounded-full">
-                  +{c.points}
-                </span>
-              ) : (
-                <span className="bg-amber-100 text-amber-900 font-mono text-[10px] font-bold px-2 py-0.5 rounded-full">
-                  {c.altMsg || "Missing"}
-                </span>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
 
       {/* INTERACTIVE DRILL-DOWN MODALS FOR ALL CARDS */}
 
@@ -1498,7 +1370,7 @@ function AdminOnboard() {
         <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} className="mt-1 w-full rounded-xl border border-black/15 px-3 py-2 text-xs font-medium focus:outline-none focus:border-[var(--brass)]" />
       </div>
 
-      <button onClick={save} disabled={busy} className="h-11 px-6 rounded-xl bg-[var(--ink)] text-white font-mono uppercase tracking-wider text-xs font-bold hover:bg-black transition disabled:opacity-60">
+      <button onClick={save} disabled={busy} className="h-11 px-6 rounded-xl bg-gradient-to-br from-[var(--brass)] to-[var(--brass-deep)] text-white font-mono uppercase tracking-wider text-xs font-bold hover:brightness-110 transition disabled:opacity-60">
         {busy ? "Saving…" : "Onboard This User"}
       </button>
     </div>
