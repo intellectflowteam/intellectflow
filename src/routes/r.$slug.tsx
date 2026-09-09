@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { aiWriter } from "@/lib/ai.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { parseBusinessMeta, cleanDescription } from "@/lib/utils";
-import { Star, Check, Copy, Loader2, ExternalLink, ShieldCheck } from "lucide-react";
+import { Star, Check, Copy, Loader2, ExternalLink, ShieldCheck, Sparkles, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/r/$slug")({
@@ -132,7 +132,6 @@ function PublicReview() {
   const [busy, setBusy] = useState(false);
   const [countdown, setCountdown] = useState(3);
   const [aiLoading, setAiLoading] = useState(false);
-  const [aiItems, setAiItems] = useState<Suggestion[] | null>(null);
   const [logoFailed, setLogoFailed] = useState(false);
 
   const meta = useMemo(() => parseBusinessMeta(biz), [biz]);
@@ -144,26 +143,22 @@ function PublicReview() {
     () => buildTemplates(bizName, biz.business_type ?? "shop", biz.city ?? "", parsedKeywords),
     [bizName, biz.business_type, biz.city, parsedKeywords],
   );
-  const templates = aiItems ?? fallback;
 
   useEffect(() => {
     if (rating === 0) return;
     setStep(rating <= 3 ? "negative" : "positive");
   }, [rating]);
 
-  const [selectedKeyword, setSelectedKeyword] = useState<string | null>(null);
+  // Typewriter reveal — `text` is what's shown/editable; `typedTarget` is the
+  // full generated review we're animating toward.
+  const [typedTarget, setTypedTarget] = useState("");
+  const [typing, setTyping] = useState(false);
+  const [editing, setEditing] = useState(false);
 
-  const availableKeywords = useMemo(() => {
-    const defaults = ["Fast Service", "Authentic Taste", "Polite Staff", "Cleanliness", "Great Value", "Best Quality"];
-    const combined = Array.from(new Set([...(parsedKeywords || []), ...defaults]));
-    return combined.slice(0, 8);
-  }, [parsedKeywords]);
-
-  const fetchFreshAiReviews = (forceSeed?: number, overrideKw?: string | null) => {
+  const fetchFreshAiReview = (forceSeed?: number) => {
     setAiLoading(true);
-    const activeKw = overrideKw !== undefined ? overrideKw : selectedKeyword;
-    const kwArray = activeKw ? [activeKw, ...(parsedKeywords || []).filter(k => k !== activeKw)] : parsedKeywords;
-
+    setTyping(false);
+    setText("");
     writer({
       data: {
         rating,
@@ -171,35 +166,47 @@ function PublicReview() {
         businessType: biz.business_type ?? "shop",
         businessCity: biz.city ?? undefined,
         businessDescription: cleanDesc || undefined,
-        targetKeywords: kwArray,
+        targetKeywords: parsedKeywords,
         language: (["English", "Hindi", "Gujarati", "Marathi"].includes(preferredLanguage) ? preferredLanguage : "English") as any,
-        count: 5,
+        count: 1,
         seed: forceSeed || Math.floor(Math.random() * 1000000),
       },
     })
       .then((res) => {
-        const items = (res.suggestions ?? [])
-          .filter((s) => s.text?.trim())
-          .map((s) => ({ text: s.text.trim(), keywords: (s.keywords ?? []).slice(0, 2) }));
-        if (items.length) {
-          setAiItems(items);
-          if (items[0]?.text) setText(items[0].text);
-        }
+        const first = (res.suggestions ?? []).find((s) => s.text?.trim());
+        setTypedTarget((first?.text ?? fallback[Math.floor(Math.random() * fallback.length)]?.text ?? "").trim());
       })
-      .catch(() => {})
+      .catch(() => {
+        setTypedTarget((fallback[Math.floor(Math.random() * fallback.length)]?.text ?? "").trim());
+      })
       .finally(() => setAiLoading(false));
   };
 
-  const handleKeywordToggle = (kw: string) => {
-    const nextKw = selectedKeyword === kw ? null : kw;
-    setSelectedKeyword(nextKw);
-    fetchFreshAiReviews(Math.floor(Math.random() * 1000000), nextKw);
-  };
-
   useEffect(() => {
-    if (step !== "positive" || aiItems || aiLoading) return;
-    fetchFreshAiReviews();
-  }, [step, aiItems, aiLoading]);
+    if (step !== "positive" || typedTarget || aiLoading) return;
+    fetchFreshAiReview();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
+
+  // Animate the review appearing character by character, like it's being
+  // typed live.
+  useEffect(() => {
+    if (!typedTarget) return;
+    setTyping(true);
+    setText("");
+    let i = 0;
+    const speed = Math.max(8, Math.min(22, Math.floor(1400 / typedTarget.length)));
+    const interval = setInterval(() => {
+      i += 1;
+      setText(typedTarget.slice(0, i));
+      if (i >= typedTarget.length) {
+        clearInterval(interval);
+        setTyping(false);
+      }
+    }, speed);
+    return () => clearInterval(interval);
+  }, [typedTarget]);
+
 
   const submit = async (positive: boolean) => {
     const res = await fetch("/api/public/submit-review", {
@@ -211,7 +218,7 @@ function PublicReview() {
         review_text: text,
         customer_name: customerName || null,
         customer_phone: customerPhone || null,
-        ai_generated: positive && templates.some((t) => t.text === text),
+        ai_generated: positive && text === typedTarget,
       }),
     });
     if (!res.ok) throw new Error("Submit failed");
@@ -241,7 +248,7 @@ function PublicReview() {
   const copyAndGoToGoogle = async (e?: React.MouseEvent) => {
     e?.preventDefault(); // we control navigation ourselves so it happens strictly after copy + submit are underway
 
-    const finalReviewText = text.trim() || (templates[0]?.text ?? `Great experience at ${bizName}! 5 stars.`);
+    const finalReviewText = text.trim() || typedTarget || (fallback[0]?.text ?? `Great experience at ${bizName}! 5 stars.`);
     let redirected = false;
     const redirectNow = () => {
       if (redirected) return;
@@ -345,17 +352,17 @@ function PublicReview() {
           </div>
 
           {step === "rate" && (
-            <>
+            <div className="animate-in fade-in duration-300">
               <p className="mt-6 text-center font-semibold">How was your experience?</p>
               <div className="mt-4 flex justify-center gap-2">
                 {[1, 2, 3, 4, 5].map((n) => (
-                  <button key={n} onClick={() => setRating(n)} className="p-1" aria-label={`${n} star`}>
-                    <Star className={"w-10 h-10 transition " + (n <= rating ? "fill-[#c9a227] text-[#c9a227]" : "text-zinc-300")} />
+                  <button key={n} onClick={() => setRating(n)} className="p-1 transition-transform hover:scale-110 active:scale-95" aria-label={`${n} star`}>
+                    <Star className={"w-10 h-10 transition-colors " + (n <= rating ? "fill-[#c9a227] text-[#c9a227]" : "text-zinc-300")} />
                   </button>
                 ))}
               </div>
               <div className="mt-6 text-center text-[11px] text-zinc-400">Powered by IntellectFlow</div>
-            </>
+            </div>
           )}
 
           {step === "negative" && (
@@ -377,79 +384,72 @@ function PublicReview() {
           )}
 
           {step === "positive" && (
-            <>
-              <div className="mt-5 space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Tap Keyword to Highlight:</p>
-                  <button
-                    onClick={() => fetchFreshAiReviews(Math.floor(Math.random() * 1000000))}
-                    disabled={aiLoading}
-                    className="text-[11px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 px-2.5 py-1 rounded-full border border-amber-200 inline-flex items-center gap-1 transition cursor-pointer"
-                  >
-                    ✨ 100% Unique Refresh
-                  </button>
-                </div>
-
-                {/* Keyword Chips */}
-                <div className="flex flex-wrap gap-1.5">
-                  {availableKeywords.map((kw) => {
-                    const active = selectedKeyword === kw;
-                    return (
-                      <button
-                        key={kw}
-                        onClick={() => handleKeywordToggle(kw)}
-                        className={
-                          "px-2.5 py-1 rounded-full text-xs font-semibold transition flex items-center gap-1 cursor-pointer " +
-                          (active
-                            ? "bg-amber-500 text-white shadow-sm"
-                            : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200 border border-black/5")
-                        }
-                      >
-                        #{kw}
-                      </button>
-                    );
-                  })}
-                </div>
+            <div className="animate-in fade-in slide-in-from-bottom-3 duration-300">
+              <div className="mt-5 flex items-center justify-between gap-2">
+                <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider inline-flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" /> Your AI-written review
+                </p>
+                <button
+                  onClick={() => fetchFreshAiReview(Math.floor(Math.random() * 1000000))}
+                  disabled={aiLoading || typing}
+                  className="text-[11px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 px-2.5 py-1 rounded-full border border-amber-200 inline-flex items-center gap-1 transition cursor-pointer disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3 h-3 ${aiLoading ? "animate-spin" : ""}`} /> Regenerate
+                </button>
               </div>
 
-              <div className="mt-4 flex items-center justify-between gap-2">
-                <p className="text-sm font-semibold text-zinc-900">Select a review option below:</p>
-              </div>
+              {/* The review card — tap it to copy + go straight to Google */}
+              <a
+                href={googleLink}
+                target="_self"
+                onClick={(e) => {
+                  if (aiLoading || typing || editing) { e.preventDefault(); return; }
+                  copyAndGoToGoogle(e);
+                }}
+                className={
+                  "mt-2.5 block w-full text-left p-4 rounded-2xl border-2 transition-all animate-in fade-in slide-in-from-bottom-2 duration-300 " +
+                  (aiLoading || typing || editing
+                    ? "border-amber-200 bg-amber-50/40 cursor-default"
+                    : "border-amber-300 bg-gradient-to-br from-amber-50 to-white shadow-sm hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98] cursor-pointer")
+                }
+              >
+                {aiLoading && !typedTarget ? (
+                  <div className="flex items-center gap-2 text-sm text-zinc-500 py-2">
+                    <Loader2 className="w-4 h-4 animate-spin text-amber-600" />
+                    AI is writing a unique review for you…
+                  </div>
+                ) : (
+                  <p className="text-[15px] leading-relaxed text-zinc-800 min-h-[3.5em]">
+                    {text}
+                    {typing && <span className="inline-block w-[2px] h-[1em] bg-amber-500 ml-0.5 align-middle animate-pulse" />}
+                  </p>
+                )}
+                {!aiLoading && !typing && !editing && (
+                  <div className="mt-3 flex items-center justify-between text-xs font-bold text-amber-700">
+                    <span className="inline-flex items-center gap-1"><Copy className="w-3.5 h-3.5" /> Tap to copy &amp; post on Google</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </div>
+                )}
+              </a>
 
-              {aiLoading && (
-                <div className="mt-2 text-xs text-zinc-500 inline-flex items-center gap-1.5 font-mono">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-600" /> AI crafting 100% unique reviews with #{selectedKeyword || "keywords"}…
-                </div>
+              {!typing && !aiLoading && (
+                <button
+                  onClick={() => setEditing((v) => !v)}
+                  className="mt-2 text-xs font-semibold text-zinc-500 hover:text-zinc-800 transition"
+                >
+                  {editing ? "Done editing" : "✏️ Edit this review"}
+                </button>
               )}
-              <div className="mt-3 space-y-2 max-h-[320px] overflow-y-auto pr-0.5">
-                {templates.map((s, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setText(s.text)}
-                    className={
-                      "w-full text-left p-3 rounded-lg border transition text-sm " +
-                      (text === s.text ? "border-[#c9a227] bg-[#fdf6ef]" : "border-zinc-200 hover:border-zinc-400")
-                    }
-                  >
-                    <span className="text-zinc-700">{s.text}</span>
-                    {text === s.text && <Check className="inline w-4 h-4 ml-1 text-emerald-600" />}
-                    {s.keywords.length > 0 && (
-                      <div className="mt-1.5 flex flex-wrap gap-1">
-                        {s.keywords.slice(0, 2).map((k) => (
-                          <span key={k} className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-600">#{k}</span>
-                        ))}
-                      </div>
-                    )}
-                  </button>
-                ))}
-              </div>
-              <textarea
-                className="mt-3 w-full min-h-[80px] rounded-lg border border-black/15 px-3 py-2 text-sm"
-                placeholder="Or write your own…"
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-              />
-              <div className="mt-2 grid grid-cols-2 gap-2">
+              {editing && (
+                <textarea
+                  autoFocus
+                  className="mt-2 w-full min-h-[90px] rounded-lg border border-black/15 px-3 py-2 text-sm"
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                />
+              )}
+
+              <div className="mt-3 grid grid-cols-2 gap-2">
                 <input className="h-10 rounded-lg border border-black/15 px-3 text-sm" placeholder="Name (optional)" value={customerName} onChange={(e) => setName(e.target.value)} />
                 <input className="h-10 rounded-lg border border-black/15 px-3 text-sm" placeholder="Phone (optional)" value={customerPhone} onChange={(e) => setPhone(e.target.value)} />
               </div>
@@ -457,14 +457,14 @@ function PublicReview() {
                 href={googleLink}
                 target="_self"
                 onClick={copyAndGoToGoogle}
-                className="mt-4 w-full h-14 rounded-xl bg-black text-white font-bold text-base flex items-center justify-center gap-2 shadow-md hover:bg-zinc-800 transition active:scale-95 cursor-pointer text-center"
+                className="mt-4 w-full h-14 rounded-xl bg-gradient-to-br from-[var(--brass)] to-[var(--brass-deep)] text-white font-bold text-base flex items-center justify-center gap-2 shadow-md hover:brightness-105 transition active:scale-95 cursor-pointer text-center"
               >
                 <Copy className="w-5 h-5" />
                 <span>Give Us Review</span>
               </a>
               {!googleLink && <p className="mt-2 text-[11px] text-orange-600 text-center">This business hasn't linked its Google profile yet — your review is saved for the owner.</p>}
               <button onClick={() => { setRating(0); setStep("rate"); }} className="mt-2 w-full h-10 text-sm text-zinc-500">Back</button>
-            </>
+            </div>
           )}
 
           {step === "redirect" && (
