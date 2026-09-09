@@ -10,8 +10,10 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminRouteRouteImport } from './routes/_admin/route'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AboutUsRouteImport } from './routes/about-us'
+import { Route as AdminLoginRouteImport } from './routes/admin-login'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as ContactUsRouteImport } from './routes/contact-us'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
@@ -19,7 +21,7 @@ import { Route as PrivacyPolicyRouteImport } from './routes/privacy-policy'
 import { Route as RefundPolicyRouteImport } from './routes/refund-policy'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as TermsOfServiceRouteImport } from './routes/terms-of-service'
-import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as AdminAdminRouteImport } from './routes/_admin/admin'
 import { Route as AuthenticatedAiReplyRouteImport } from './routes/_authenticated/ai-reply'
 import { Route as AuthenticatedBillingRouteImport } from './routes/_authenticated/billing'
 import { Route as AuthenticatedCompetitorsRouteImport } from './routes/_authenticated/competitors'
@@ -44,6 +46,10 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRouteRoute = AdminRouteRouteImport.update({
+  id: '/_admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
   id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
@@ -51,6 +57,11 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const AboutUsRoute = AboutUsRouteImport.update({
   id: '/about-us',
   path: '/about-us',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminLoginRoute = AdminLoginRouteImport.update({
+  id: '/admin-login',
+  path: '/admin-login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -88,10 +99,10 @@ const TermsOfServiceRoute = TermsOfServiceRouteImport.update({
   path: '/terms-of-service',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
+const AdminAdminRoute = AdminAdminRouteImport.update({
   id: '/admin',
   path: '/admin',
-  getParentRoute: () => AuthenticatedRouteRoute,
+  getParentRoute: () => AdminRouteRoute,
 } as any)
 const AuthenticatedAiReplyRoute = AuthenticatedAiReplyRouteImport.update({
   id: '/ai-reply',
@@ -192,6 +203,7 @@ const ApiPublicWeeklyDataRefreshRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about-us': typeof AboutUsRoute
+  '/admin-login': typeof AdminLoginRoute
   '/auth': typeof AuthRouteWithChildren
   '/contact-us': typeof ContactUsRoute
   '/onboarding': typeof OnboardingRoute
@@ -199,7 +211,7 @@ export interface FileRoutesByFullPath {
   '/refund-policy': typeof RefundPolicyRoute
   '/reset-password': typeof ResetPasswordRoute
   '/terms-of-service': typeof TermsOfServiceRoute
-  '/admin': typeof AuthenticatedAdminRoute
+  '/admin': typeof AdminAdminRoute
   '/ai-reply': typeof AuthenticatedAiReplyRoute
   '/billing': typeof AuthenticatedBillingRoute
   '/competitors': typeof AuthenticatedCompetitorsRoute
@@ -222,6 +234,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about-us': typeof AboutUsRoute
+  '/admin-login': typeof AdminLoginRoute
   '/auth': typeof AuthRouteWithChildren
   '/contact-us': typeof ContactUsRoute
   '/onboarding': typeof OnboardingRoute
@@ -229,7 +242,7 @@ export interface FileRoutesByTo {
   '/refund-policy': typeof RefundPolicyRoute
   '/reset-password': typeof ResetPasswordRoute
   '/terms-of-service': typeof TermsOfServiceRoute
-  '/admin': typeof AuthenticatedAdminRoute
+  '/admin': typeof AdminAdminRoute
   '/ai-reply': typeof AuthenticatedAiReplyRoute
   '/billing': typeof AuthenticatedBillingRoute
   '/competitors': typeof AuthenticatedCompetitorsRoute
@@ -252,8 +265,10 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_admin': typeof AdminRouteRouteWithChildren
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/about-us': typeof AboutUsRoute
+  '/admin-login': typeof AdminLoginRoute
   '/auth': typeof AuthRouteWithChildren
   '/contact-us': typeof ContactUsRoute
   '/onboarding': typeof OnboardingRoute
@@ -261,7 +276,7 @@ export interface FileRoutesById {
   '/refund-policy': typeof RefundPolicyRoute
   '/reset-password': typeof ResetPasswordRoute
   '/terms-of-service': typeof TermsOfServiceRoute
-  '/_authenticated/admin': typeof AuthenticatedAdminRoute
+  '/_admin/admin': typeof AdminAdminRoute
   '/_authenticated/ai-reply': typeof AuthenticatedAiReplyRoute
   '/_authenticated/billing': typeof AuthenticatedBillingRoute
   '/_authenticated/competitors': typeof AuthenticatedCompetitorsRoute
@@ -286,6 +301,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/about-us'
+    | '/admin-login'
     | '/auth'
     | '/contact-us'
     | '/onboarding'
@@ -316,6 +332,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/about-us'
+    | '/admin-login'
     | '/auth'
     | '/contact-us'
     | '/onboarding'
@@ -345,8 +362,10 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/_admin'
     | '/_authenticated'
     | '/about-us'
+    | '/admin-login'
     | '/auth'
     | '/contact-us'
     | '/onboarding'
@@ -354,7 +373,7 @@ export interface FileRouteTypes {
     | '/refund-policy'
     | '/reset-password'
     | '/terms-of-service'
-    | '/_authenticated/admin'
+    | '/_admin/admin'
     | '/_authenticated/ai-reply'
     | '/_authenticated/billing'
     | '/_authenticated/competitors'
@@ -377,8 +396,10 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRouteRoute: typeof AdminRouteRouteWithChildren
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AboutUsRoute: typeof AboutUsRoute
+  AdminLoginRoute: typeof AdminLoginRoute
   AuthRoute: typeof AuthRouteWithChildren
   ContactUsRoute: typeof ContactUsRoute
   OnboardingRoute: typeof OnboardingRoute
@@ -403,6 +424,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_admin': {
+      id: '/_admin'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AdminRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated': {
       id: '/_authenticated'
       path: ''
@@ -415,6 +443,13 @@ declare module '@tanstack/react-router' {
       path: '/about-us'
       fullPath: '/about-us'
       preLoaderRoute: typeof AboutUsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin-login': {
+      id: '/admin-login'
+      path: '/admin-login'
+      fullPath: '/admin-login'
+      preLoaderRoute: typeof AdminLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth': {
@@ -466,12 +501,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TermsOfServiceRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/admin': {
-      id: '/_authenticated/admin'
+    '/_admin/admin': {
+      id: '/_admin/admin'
       path: '/admin'
       fullPath: '/admin'
-      preLoaderRoute: typeof AuthenticatedAdminRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
+      preLoaderRoute: typeof AdminAdminRouteImport
+      parentRoute: typeof AdminRouteRoute
     }
     '/_authenticated/ai-reply': {
       id: '/_authenticated/ai-reply'
@@ -602,8 +637,19 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AdminRouteRouteChildren {
+  AdminAdminRoute: typeof AdminAdminRoute
+}
+
+const AdminRouteRouteChildren: AdminRouteRouteChildren = {
+  AdminAdminRoute: AdminAdminRoute,
+}
+
+const AdminRouteRouteWithChildren = AdminRouteRoute._addFileChildren(
+  AdminRouteRouteChildren,
+)
+
 interface AuthenticatedRouteRouteChildren {
-  AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedAiReplyRoute: typeof AuthenticatedAiReplyRoute
   AuthenticatedBillingRoute: typeof AuthenticatedBillingRoute
   AuthenticatedCompetitorsRoute: typeof AuthenticatedCompetitorsRoute
@@ -618,7 +664,6 @@ interface AuthenticatedRouteRouteChildren {
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
-  AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedAiReplyRoute: AuthenticatedAiReplyRoute,
   AuthenticatedBillingRoute: AuthenticatedBillingRoute,
   AuthenticatedCompetitorsRoute: AuthenticatedCompetitorsRoute,
@@ -647,8 +692,10 @@ const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRouteRoute: AdminRouteRouteWithChildren,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AboutUsRoute: AboutUsRoute,
+  AdminLoginRoute: AdminLoginRoute,
   AuthRoute: AuthRouteWithChildren,
   ContactUsRoute: ContactUsRoute,
   OnboardingRoute: OnboardingRoute,

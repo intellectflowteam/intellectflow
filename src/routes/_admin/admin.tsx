@@ -1,4 +1,4 @@
-import { createFileRoute, redirect, Link } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { PlaceSearchInput } from "@/components/PlaceSearchInput";
 import { adminOnboardUser } from "@/lib/admin.functions";
@@ -40,25 +40,13 @@ import { NewBusinessNotifier } from "@/components/NewBusinessNotifier";
 import { computeSeoHealth } from "@/lib/seo-score";
 import { SeoHealthCard } from "@/components/SeoHealthCard";
 
-export const Route = createFileRoute("/_authenticated/admin")({
+export const Route = createFileRoute("/_admin/admin")({
   head: () => ({
     meta: [
-      { title: "Admin Master Console — IntellectFlow" },
+      { title: "Admin Dashboard — IntellectFlow" },
       { name: "description", content: "Platform admin panel to track users, inspect full user dashboards, and grant free lifetime access." },
     ],
   }),
-  beforeLoad: async () => {
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) throw redirect({ to: "/auth" });
-
-    const [roleRes, profRes] = await Promise.all([
-      supabase.from("user_roles").select("role").eq("user_id", u.user.id).eq("role", "admin").maybeSingle(),
-      supabase.from("profiles").select("is_admin").eq("id", u.user.id).maybeSingle(),
-    ]);
-
-    const isAdmin = roleRes.data?.role === "admin" || profRes.data?.is_admin === true;
-    if (!isAdmin) throw redirect({ to: "/dashboard" });
-  },
   component: AdminCRM,
 });
 
