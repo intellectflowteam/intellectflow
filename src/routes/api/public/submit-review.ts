@@ -31,11 +31,43 @@ export const Route = createFileRoute("/api/public/submit-review")({
 
         const { data: biz, error: bizErr } = await supabaseAdmin
           .from("businesses")
-          .select("id, name, gmb_link, description")
+          .select("id, name, gmb_link, description, user_id")
           .ilike("slug", cleanSlug)
           .maybeSingle();
         if (bizErr || !biz) {
           return new Response(JSON.stringify({ error: "Business not found" }), { status: 404 });
+        }
+
+        // Enforce the plan's monthly review-collection cap. Trial and
+        // lifetime-free accounts get unlimited (same "everything unlocked"
+        // treatment as every other gated feature).
+        {
+          const { computeAccess } = await import("@/lib/plans");
+          const { parseLimit } = await import("@/lib/plan-limits");
+          const { data: profile } = await supabaseAdmin
+            .from("profiles")
+            .select("plan, lifetime_free, is_founder_free, subscription_status, trial_ends_at, created_at")
+            .eq("id", biz.user_id)
+            .maybeSingle();
+          const access = computeAccess(profile);
+          const effectivePlan = access.lifetimeFree || access.onTrial ? "pro" : access.plan;
+          const limit = parseLimit(effectivePlan, "Review collection");
+          if (limit !== "unlimited" && limit !== false) {
+            const startOfMonth = new Date();
+            startOfMonth.setDate(1);
+            startOfMonth.setHours(0, 0, 0, 0);
+            const { count } = await supabaseAdmin
+              .from("reviews")
+              .select("id", { count: "exact", head: true })
+              .eq("business_id", biz.id)
+              .gte("created_at", startOfMonth.toISOString());
+            if ((count ?? 0) >= limit) {
+              return new Response(
+                JSON.stringify({ error: "This business has reached its monthly review collection limit. Please try again next month, or ask the owner to upgrade their plan." }),
+                { status: 429, headers: { "content-type": "application/json" } },
+              );
+            }
+          }
         }
 
         const isPositive = rating >= 3;
@@ -65,14 +97,11 @@ export const Route = createFileRoute("/api/public/submit-review")({
         // owner sees ready replies without opening the AI Reply tool manually.
         if (!isPositive) {
           try {
-            const { aiReply } = await import("@/lib/ai.functions");
-            const suggestion = await aiReply({
-              data: {
-                reviewText: review_text,
-                rating,
-                businessName: biz.name,
-                businessDescription: (biz as any).description || undefined,
-              },
+            const { generateReplySuggestions } = await import("@/lib/ai.functions");
+            const suggestion = await generateReplySuggestions({
+              reviewText: review_text,
+              rating,
+              businessName: biz.name,
             });
             await supabaseAdmin
               .from("reviews")

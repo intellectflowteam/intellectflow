@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { getMyBusiness, getMyProfile } from "@/lib/queries";
-import { computeAccess, PLANS } from "@/lib/plans";
+import { computeAccess, PLANS, planHasFeature, type PlanId } from "@/lib/plans";
 import { QRCodeSVG } from "qrcode.react";
 import { useRef, useState } from "react";
 import { MessageSquare, Star, QrCode, TrendingUp, Copy, ExternalLink, Crown, Clock, Download, Trophy, Reply, AlertTriangle, X, HelpCircle, Image as ImageIcon, MessageCircle, MapPin, Sparkles, Globe, Phone, Layers, Info, Loader2 } from "lucide-react";
@@ -34,6 +34,8 @@ function Dashboard() {
   const { data: biz } = useQuery({ queryKey: ["biz"], queryFn: getMyBusiness });
   const { data: profile } = useQuery({ queryKey: ["profile"], queryFn: getMyProfile });
   const access = computeAccess(profile);
+  const effectivePlan: PlanId = access.lifetimeFree || access.onTrial ? "pro" : access.plan;
+  const hasRankTracker = planHasFeature(effectivePlan, "Local Rank Tracker vs competitors");
 
   const { data: reviews } = useQuery({
     queryKey: ["dash-reviews", biz?.id],
@@ -87,6 +89,10 @@ function Dashboard() {
   const checkKeywordsFn = useServerFn(checkMyKeywordRankings);
   const [checkingKeywordsNow, setCheckingKeywordsNow] = useState(false);
   const runKeywordCheckNow = async () => {
+    if (!hasRankTracker) {
+      toast.error("Local Rank Tracker is available on the Business Pro plan");
+      return;
+    }
     setCheckingKeywordsNow(true);
     try {
       const res = await checkKeywordsFn({});
@@ -417,7 +423,7 @@ function Dashboard() {
           <div className="flex items-center gap-2">
             <button
               onClick={runKeywordCheckNow}
-              disabled={checkingKeywordsNow}
+              disabled={checkingKeywordsNow || !hasRankTracker}
               className="text-xs font-bold border border-black/15 text-zinc-700 px-3 py-1.5 rounded-full hover:bg-zinc-50 transition disabled:opacity-50 inline-flex items-center gap-1.5"
             >
               {checkingKeywordsNow ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />} Check Now
@@ -428,7 +434,12 @@ function Dashboard() {
           </div>
         </div>
 
-        {(() => {
+        {!hasRankTracker ? (
+          <div className="rounded-xl border border-dashed border-black/15 p-6 text-center text-sm text-zinc-500">
+            Local Rank Tracker (see exactly where you rank vs competitors for each keyword) is a <b>Business Pro</b> feature.{" "}
+            <Link to="/billing" className="text-[var(--brass-deep)] font-bold underline">Upgrade to unlock →</Link>
+          </div>
+        ) : (() => {
           const rawKw = (biz as any)?.target_keywords;
           const userKws: string[] = typeof rawKw === "string" && rawKw.trim()
             ? rawKw.split(",").map((k: string) => k.trim()).filter(Boolean)

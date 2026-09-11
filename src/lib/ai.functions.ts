@@ -1,5 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { resolveBusinessAndPlan, assertUnderLimit, parseLimit, countFeatureUsage, logFeatureUsage, startOfCurrentMonthISO } from "@/lib/plan-limits";
 
 // Generic OpenAI-compatible chat-completions client. Works as-is with OpenAI,
 // and with any OpenAI-compatible provider (OpenRouter, Groq, Together, a
@@ -202,8 +204,44 @@ Return JSON: { "suggestions": [ {"text":"...", "keywords":["kw1","kw2"]} ] }`;
     return { suggestions: shuffled.slice(0, data.count) };
   });
 
+// Core reply generation — used both by the plan-gated aiReply server
+// function below (owner's manual "Generate reply" action, counted against
+// their monthly quota) and, without the auth/quota wrapper, by the
+// automatic negative-review suggestion triggered from submit-review.ts —
+// that's a system behavior tied to receiving a bad review, not something
+// that should consume or require the owner's own AI Reply allowance.
+export async function generateReplySuggestions(input: {
+  businessName: string;
+  reviewText: string;
+  rating: number;
+  targetKeywords?: string[];
+}): Promise<{ replies: { lang: string; text: string }[] }> {
+  const kwStr = (input.targetKeywords || []).filter(Boolean).join(", ");
+  const system = `You are a polite owner of ${input.businessName}. Write 4 reply variants for a customer review:
+1. Hindi / Hinglish (natural Roman/Devanagari Hindi)
+2. Gujarati (natural Gujarati)
+3. Marathi (natural Devanagari Marathi)
+4. English (professional)
+Return JSON: { "replies": [ {"lang":"Hinglish","text":"..."}, {"lang":"Gujarati","text":"..."}, {"lang":"Marathi","text":"..."}, {"lang":"English","text":"..."} ] }
+Each about 30 words, warm and specific. Incorporate owner's target SEO keywords if relevant: ${kwStr || "quality service, customer satisfaction"}. If rating <= 2, apologize and invite customer to reach out.`;
+  const user = `Review (${input.rating} stars): "${input.reviewText}"`;
+  const raw = await callAI(system, user);
+  if (!raw.trim()) {
+    throw new Error("AI provider returned no response — check that AI_API_KEY (or GEMINI_API_KEY) is set correctly on the server.");
+  }
+  try {
+    const cleaned = raw.replace(/^```json\s*|\s*```$/g, "").trim();
+    const parsed = JSON.parse(cleaned) as { replies: { lang: string; text: string }[] };
+    if (!parsed.replies?.length) throw new Error("empty");
+    return parsed;
+  } catch {
+    throw new Error("Could not generate a reply — try again in a moment.");
+  }
+}
+
 // AI Review reply generator — Personalized in Hindi, Gujarati, English & Marathi with SEO keywords
 export const aiReply = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((raw: unknown) =>
     z.object({
       businessName: z.string().min(1).max(120),
@@ -213,32 +251,20 @@ export const aiReply = createServerFn({ method: "POST" })
       preferredLanguage: z.enum(["English", "Hindi", "Gujarati", "Marathi"]).optional(),
     }).parse(raw),
   )
-  .handler(async ({ data }) => {
-    const kwStr = (data.targetKeywords || []).filter(Boolean).join(", ");
-    const system = `You are a polite owner of ${data.businessName}. Write 4 reply variants for a customer review:
-1. Hindi / Hinglish (natural Roman/Devanagari Hindi)
-2. Gujarati (natural Gujarati)
-3. Marathi (natural Devanagari Marathi)
-4. English (professional)
-Return JSON: { "replies": [ {"lang":"Hinglish","text":"..."}, {"lang":"Gujarati","text":"..."}, {"lang":"Marathi","text":"..."}, {"lang":"English","text":"..."} ] }
-Each about 30 words, warm and specific. Incorporate owner's target SEO keywords if relevant: ${kwStr || "quality service, customer satisfaction"}. If rating <= 2, apologize and invite customer to reach out.`;
-    const user = `Review (${data.rating} stars): "${data.reviewText}"`;
-    const raw = await callAI(system, user);
-    if (!raw.trim()) {
-      throw new Error("AI provider returned no response — check that AI_API_KEY (or GEMINI_API_KEY) is set correctly on the server.");
-    }
-    try {
-      const cleaned = raw.replace(/^```json\s*|\s*```$/g, "").trim();
-      const parsed = JSON.parse(cleaned) as { replies: { lang: string; text: string }[] };
-      if (!parsed.replies?.length) throw new Error("empty");
-      return parsed;
-    } catch {
-      throw new Error("Could not generate a reply — try again in a moment.");
-    }
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as any;
+    const { businessId, plan } = await resolveBusinessAndPlan(supabase, userId);
+    const used = await countFeatureUsage(supabase, businessId, "ai_reply", startOfCurrentMonthISO());
+    assertUnderLimit(plan, "AI Reply", used);
+
+    const result = await generateReplySuggestions(data);
+    await logFeatureUsage(supabase, businessId, "ai_reply");
+    return result;
   });
 
 // GMB Post & Visual Promo Banner Generator
 export const gmbPost = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((raw: unknown) =>
     z.object({
       businessName: z.string().min(1).max(120),
@@ -247,7 +273,16 @@ export const gmbPost = createServerFn({ method: "POST" })
       language: z.enum(["English", "Hindi", "Gujarati", "Marathi"]).default("English"),
     }).parse(raw),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as any;
+    const { businessId, plan } = await resolveBusinessAndPlan(supabase, userId);
+    const { count } = await supabase
+      .from("gmb_posts")
+      .select("id", { count: "exact", head: true })
+      .eq("business_id", businessId)
+      .gte("created_at", startOfCurrentMonthISO());
+    assertUnderLimit(plan, "GMB Post Generator", count ?? 0);
+
     const kwList = (data.targetKeywords || []).filter(Boolean);
     const kwStr = kwList.join(", ");
     const system = `You write engaging Google Business Profile posts for Indian small businesses. About 90-110 words, include a clear CTA, target SEO keywords, and 3-5 relevant hashtags.`;
@@ -268,6 +303,7 @@ export const gmbPost = createServerFn({ method: "POST" })
 
 // Auto FAQ Generator — builds Google-Business-Profile-ready Q&A pairs
 export const generateFAQs = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((raw: unknown) =>
     z.object({
       businessName: z.string().min(1).max(120),
@@ -278,11 +314,25 @@ export const generateFAQs = createServerFn({ method: "POST" })
       count: z.number().min(3).max(15).default(8),
     }).parse(raw),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as any;
+    const { businessId, plan } = await resolveBusinessAndPlan(supabase, userId);
+    const { count: existingTotal } = await supabase
+      .from("faqs")
+      .select("id", { count: "exact", head: true })
+      .eq("business_id", businessId);
+    const limit = parseLimit(plan, "Auto FAQ Generator");
+    if (limit === false) throw new Error(`"Auto FAQ Generator" isn't available on your current plan. Upgrade to unlock it.`);
+    const remaining = limit === "unlimited" ? data.count : Math.max(0, limit - (existingTotal ?? 0));
+    if (remaining <= 0) {
+      throw new Error(`You've reached your plan's FAQ limit (${limit}). Upgrade to generate more.`);
+    }
+    const effectiveCount = Math.min(data.count, remaining);
+
     const system = `You write short, helpful FAQ pairs for a small business's Google Business Profile Q&A section. Return STRICT JSON only, no markdown fences.`;
     const user = `Business: ${data.businessName} (${data.businessType})${data.businessCity ? ` in ${data.businessCity}` : ""}
 ${data.businessDescription ? `About: ${data.businessDescription}\n` : ""}${data.recentReviewTexts.length ? `Recent customer reviews (use these for context on what customers actually ask/care about):\n${data.recentReviewTexts.map((t) => `- ${t}`).join("\n")}\n` : ""}
-Write ${data.count} DIFFERENT FAQ pairs a real customer would search for or ask before visiting. Rules:
+Write ${effectiveCount} DIFFERENT FAQ pairs a real customer would search for or ask before visiting. Rules:
 - Questions: short, natural, how a customer would type them (e.g. "Do you have parking?", "What are your timings?").
 - Answers: 1-2 sentences, specific to this business, friendly tone, no placeholders like "[insert]".
 - Cover a mix: timings/location, pricing/offers, services/products, policies, and anything relevant from the reviews.
@@ -292,7 +342,7 @@ Return JSON: { "faqs": [ {"question":"...","answer":"..."} ] }`;
     const raw = await callAI(system, user);
     if (raw) {
       const parsed = extractJson<{ faqs: { question: string; answer: string }[] }>(raw);
-      if (parsed?.faqs?.length) return parsed;
+      if (parsed?.faqs?.length) return { faqs: parsed.faqs.slice(0, effectiveCount) };
     }
 
     // Smart fallback FAQs if AI is rate-limited or unreachable
@@ -308,12 +358,13 @@ Return JSON: { "faqs": [ {"question":"...","answer":"..."} ] }`;
         { question: `Are digital payments (UPI, Cards, GPay) accepted at ${name}?`, answer: `Yes, we accept all popular digital payment options including Google Pay, PhonePe, Paytm, and cards.` },
         { question: `How can I contact ${name} for inquiries?`, answer: `You can call us directly or visit our ${type} in ${city}. We are always happy to assist you!` },
         { question: `Do I need a prior appointment before visiting ${name}?`, answer: `Walk-ins are always welcome! For special weekend services or bulk orders, calling ahead is recommended.` },
-      ],
+      ].slice(0, effectiveCount),
     };
   });
 
 // Competitor SWOT — analyzes tracked competitors against this business
 export const competitorSwot = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((raw: unknown) =>
     z.object({
       businessName: z.string().min(1).max(120),
@@ -345,7 +396,11 @@ export const competitorSwot = createServerFn({ method: "POST" })
       }).optional(),
     }).parse(raw),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as any;
+    const { plan } = await resolveBusinessAndPlan(supabase, userId);
+    assertUnderLimit(plan, "Competitor Tracking (SWOT)", 0);
+
     const system = `You are a local-business growth consultant. Compare a business against its tracked competitors and its own real Google ranking/review data, then produce a short, specific SWOT analysis. Return STRICT JSON only, no markdown fences.`;
     const compLines = data.competitors
       .map((c) => `- ${c.name}: ${c.rating ?? "?"}★ (${c.reviewCount ?? "?"} reviews)`)
@@ -452,16 +507,35 @@ Return JSON: { "strengths": ["..."], "weaknesses": ["..."], "opportunities": [".
   });
 
 // Sentiment analysis
-export const sentiment = createServerFn({ method: "POST" })
-  .inputValidator((raw: unknown) => z.object({ text: z.string().min(1).max(2000) }).parse(raw))
-  .handler(async ({ data }) => {
-    const system = `You classify short Google reviews. Return STRICT JSON only.`;
-    const user = `Review: "${data.text}"
-Return JSON: { "sentiment": "positive|neutral|negative", "score": 0.0-1.0, "summary": "one short sentence" }`;
+// Sentiment Analysis + Summary — analyzes a batch of recent reviews and
+// produces an overall breakdown + natural-language summary. Growth+ feature.
+export const sentimentSummary = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((raw: unknown) =>
+    z.object({
+      reviews: z.array(z.object({ rating: z.number(), text: z.string().max(600) })).min(1).max(60),
+    }).parse(raw),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as any;
+    const { plan } = await resolveBusinessAndPlan(supabase, userId);
+    assertUnderLimit(plan, "Sentiment Analysis + Summary", 0);
+
+    const system = `You analyze a batch of customer reviews for a small business and produce an overall sentiment breakdown. Return STRICT JSON only, no markdown fences.`;
+    const reviewLines = data.reviews.map((r) => `- (${r.rating}★) ${r.text}`).join("\n");
+    const user = `Reviews:\n${reviewLines}\n\nReturn JSON: { "positivePct": number, "neutralPct": number, "negativePct": number, "summary": "2-3 sentence plain-language summary of what customers love and what they complain about", "topThemes": ["short theme", "short theme", "short theme"] } — the three percentages must add up to 100.`;
     const raw = await callAI(system, user);
+    if (!raw.trim()) {
+      throw new Error("AI provider returned no response — check that AI_API_KEY (or GEMINI_API_KEY) is set correctly on the server.");
+    }
     try {
-      return JSON.parse(raw.replace(/^```json\s*|\s*```$/g, "").trim());
+      const cleaned = raw.replace(/^```json\s*|\s*```$/g, "").trim();
+      const parsed = JSON.parse(cleaned) as {
+        positivePct: number; neutralPct: number; negativePct: number; summary: string; topThemes: string[];
+      };
+      if (!parsed.summary) throw new Error("empty");
+      return parsed;
     } catch {
-      return { sentiment: "neutral", score: 0.5, summary: raw.slice(0, 120) };
+      throw new Error("Could not analyze sentiment — try again in a moment.");
     }
   });

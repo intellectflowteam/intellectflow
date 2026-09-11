@@ -304,6 +304,35 @@ export type Database = {
           },
         ]
       }
+      feature_usage: {
+        Row: {
+          id: string
+          business_id: string
+          feature: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          business_id: string
+          feature: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          business_id?: string
+          feature?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feature_usage_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       faqs: {
         Row: {
           answer: string

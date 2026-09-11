@@ -1,8 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import { getMyBusiness } from "@/lib/queries";
+import { getMyBusiness, getMyProfile } from "@/lib/queries";
+import { computeAccess, planHasFeature, type PlanId } from "@/lib/plans";
+import { parseLimit } from "@/lib/plan-limits";
 import { getPlaceDetails, searchNearbyCompetitors, type PlaceSuggestion } from "@/lib/places.functions";
 import { PlaceSearchInput } from "@/components/PlaceSearchInput";
 import { useState, useEffect, useRef } from "react";
@@ -20,6 +22,10 @@ const AUTO_LIMIT = 5;
 
 function Comp() {
   const { data: biz } = useQuery({ queryKey: ["biz"], queryFn: getMyBusiness });
+  const { data: profile } = useQuery({ queryKey: ["profile"], queryFn: getMyProfile });
+  const access = computeAccess(profile);
+  const effectivePlan: PlanId = access.lifetimeFree || access.onTrial ? "pro" : access.plan;
+  const hasSwotAccess = planHasFeature(effectivePlan, "Competitor Tracking (SWOT)");
   const qc = useQueryClient();
   const details = useServerFn(getPlaceDetails);
   const nearby = useServerFn(searchNearbyCompetitors);
@@ -53,7 +59,7 @@ function Comp() {
   });
 
   useEffect(() => {
-    if (biz && rows !== undefined && !autoBusy && !autoTriggered.current) {
+    if (biz && rows !== undefined && !autoBusy && !autoTriggered.current && hasSwotAccess) {
       const swotObj = (biz as any)?.swot_summary;
       const isSwotEmpty =
         !swotObj ||
@@ -71,6 +77,11 @@ function Comp() {
 
   const addFromPlace = async (s: PlaceSuggestion) => {
     if (!biz) return;
+    const limit = parseLimit(effectivePlan, "Competitor Tracking (SWOT)");
+    if (limit !== "unlimited" && limit !== false && (rows?.length ?? 0) >= limit) {
+      toast.error(`Your plan tracks up to ${limit} competitor${limit === 1 ? "" : "s"}. Remove one to add another.`);
+      return;
+    }
     setBusy(true);
     try {
       const d = await details({ data: { place_id: s.place_id } });
@@ -214,6 +225,12 @@ function Comp() {
 
       let fetchResults: any[] = [];
       let nearbyErrorMessage: string | null = null;
+      const swotLimit = parseLimit(effectivePlan, "Competitor Tracking (SWOT)");
+      const remainingSlots = swotLimit === "unlimited" ? AUTO_LIMIT : swotLimit === false ? 0 : Math.max(0, swotLimit - (rows?.length ?? 0));
+      if (remainingSlots <= 0) {
+        setAutoBusy(false);
+        return;
+      }
       try {
         const res = await nearby({
           data: {
@@ -223,7 +240,7 @@ function Comp() {
             self_place_id: biz.place_id ?? undefined,
             self_name: biz.name,
             radius_meters: RADIUS_METERS,
-            limit: AUTO_LIMIT,
+            limit: Math.min(AUTO_LIMIT, remainingSlots),
           },
         });
         fetchResults = res.results || [];
@@ -303,6 +320,23 @@ function Comp() {
   };
 
   const swot = (biz as any)?.swot_summary as Swot | null | undefined;
+
+  if (biz && !hasSwotAccess) {
+    return (
+      <div className="max-w-lg mx-auto text-center py-16 px-4">
+        <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-[var(--brass)] to-[var(--brass-deep)] text-white grid place-items-center mb-4">
+          <ShieldAlert className="w-8 h-8" />
+        </div>
+        <h1 className="font-black text-2xl text-[var(--ink)]">Competitor Tracking is a Pro feature</h1>
+        <p className="mt-2 text-sm text-zinc-500">
+          Track nearby competitors, see who's ranking above you, and get an AI-written SWOT analysis grounded in your real Google data — available on the Business Pro plan.
+        </p>
+        <Link to="/billing" className="mt-6 inline-flex h-12 px-6 rounded-lg bg-gradient-to-br from-[var(--brass)] to-[var(--brass-deep)] text-white font-bold items-center gap-2">
+          Upgrade to Pro
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

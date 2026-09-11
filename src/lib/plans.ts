@@ -23,7 +23,7 @@ export type FeatureRow = {
 /** Single source of truth — one row per feature, tier limits shown inline (no duplicates). */
 export const FEATURE_MATRIX: FeatureRow[] = [
   { name: "QR + Public Review Page", starter: true, growth: true, pro: true },
-  { name: "Unlimited review collection", starter: true, growth: true, pro: true },
+  { name: "Review collection", starter: "100 / month", growth: "500 / month", pro: "Unlimited" },
   { name: "Smart QR (5★ → Google, 1–3★ private)", starter: true, growth: true, pro: true },
   { name: "AI Review Writer (2 SEO keywords)", starter: true, growth: true, pro: true },
   { name: "Negative Review Filter → Private", starter: true, growth: true, pro: true },
@@ -41,7 +41,8 @@ export const FEATURE_MATRIX: FeatureRow[] = [
   { name: "Review volume & rating trend", starter: false, growth: true, pro: true },
   { name: "Best Time to Ask + Post", starter: false, growth: true, pro: true },
   { name: "Weekly Smart PDF Report", starter: false, growth: true, pro: true },
-  { name: "WhatsApp Broadcast Pack", starter: false, growth: "5", pro: "20" },
+  { name: "WhatsApp Broadcast Pack", starter: false, growth: "5 / month", pro: "20 / month" },
+  { name: "1000 Google Review Cards (printed)", starter: false, growth: true, pro: true },
   { name: "Competitor Tracking (SWOT)", starter: false, growth: false, pro: "2 competitors" },
   { name: "Local Rank Tracker vs competitors", starter: false, growth: false, pro: true },
   { name: "Rating Drop Alert", starter: false, growth: false, pro: true },

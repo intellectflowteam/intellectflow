@@ -4,12 +4,13 @@ import { useServerFn } from "@tanstack/react-start";
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { getMyBusiness } from "@/lib/queries";
+import { getMyBusiness, getMyProfile } from "@/lib/queries";
+import { computeAccess, planHasFeature, type PlanId } from "@/lib/plans";
 import { getPlaceDetails } from "@/lib/places.functions";
-import { aiReply } from "@/lib/ai.functions";
+import { aiReply, sentimentSummary } from "@/lib/ai.functions";
 import { parseBusinessMeta } from "@/lib/utils";
 import { PlaceSearchInput } from "@/components/PlaceSearchInput";
-import { Star, Loader2, RefreshCw, ExternalLink, Sparkles, Copy, Search, MapPin } from "lucide-react";
+import { Star, Loader2, RefreshCw, ExternalLink, Sparkles, Copy, Search, MapPin, BarChart3 } from "lucide-react";
 
 
 export const Route = createFileRoute("/_authenticated/reviews")({
@@ -28,7 +29,11 @@ export const Route = createFileRoute("/_authenticated/reviews")({
 
 function Reviews() {
   const { data: biz } = useQuery({ queryKey: ["biz"], queryFn: getMyBusiness });
-  const [tab, setTab] = useState<"google" | "collected" | "search">("google");
+  const { data: profile } = useQuery({ queryKey: ["profile"], queryFn: getMyProfile });
+  const access = computeAccess(profile);
+  const effectivePlan: PlanId = access.lifetimeFree || access.onTrial ? "pro" : access.plan;
+  const hasGoogleImport = planHasFeature(effectivePlan, "Live Google Reviews Import");
+  const [tab, setTab] = useState<"google" | "collected" | "search">("collected");
   const details = useServerFn(getPlaceDetails);
   const meta = useMemo(() => parseBusinessMeta(biz), [biz]);
   const qc = useQueryClient();
@@ -39,6 +44,29 @@ function Reviews() {
     enabled: !!biz?.id,
     queryFn: async () => (await supabase.from("reviews").select("*").eq("business_id", biz!.id).order("created_at", { ascending: false })).data ?? [],
   });
+
+  const hasSentiment = planHasFeature(effectivePlan, "Sentiment Analysis + Summary");
+  const sentimentFn = useServerFn(sentimentSummary);
+  const [sentimentResult, setSentimentResult] = useState<{
+    positivePct: number; neutralPct: number; negativePct: number; summary: string; topThemes: string[];
+  } | null>(null);
+  const [sentimentBusy, setSentimentBusy] = useState(false);
+  const runSentimentAnalysis = async () => {
+    const withText = (reviews ?? []).filter((r) => r.review_text?.trim()).slice(0, 40);
+    if (withText.length < 3) {
+      toast.error("Need at least 3 written reviews to analyze");
+      return;
+    }
+    setSentimentBusy(true);
+    try {
+      const res = await sentimentFn({ data: { reviews: withText.map((r) => ({ rating: r.rating, text: r.review_text! })) } });
+      setSentimentResult(res);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Analysis failed");
+    } finally {
+      setSentimentBusy(false);
+    }
+  };
 
   const targetPlaceId = useMemo(() => {
     if (biz?.gmb_link) {
@@ -55,7 +83,7 @@ function Reviews() {
 
   const google = useQuery({
     queryKey: ["google-reviews", targetPlaceId, biz?.name],
-    enabled: !!biz?.id,
+    enabled: !!biz?.id && hasGoogleImport,
     staleTime: 0,
     retry: false,
     queryFn: async () => details({ data: { place_id: targetPlaceId, business_name: biz?.name } }),
@@ -77,10 +105,10 @@ function Reviews() {
 
       <div className="flex items-center gap-2 border-b border-black/10 pb-3 flex-wrap">
         <button
-          onClick={() => setTab("google")}
-          className={"h-8 px-3 rounded-full text-xs font-bold transition " + (tab === "google" ? "bg-gradient-to-br from-[var(--brass)] to-[var(--brass-deep)] text-white" : "bg-black/5 text-zinc-600 hover:bg-black/10")}
+          onClick={() => hasGoogleImport ? setTab("google") : toast.info("Live Google Reviews Import is available on Growth & Business Pro plans")}
+          className={"h-8 px-3 rounded-full text-xs font-bold transition inline-flex items-center gap-1 " + (tab === "google" ? "bg-gradient-to-br from-[var(--brass)] to-[var(--brass-deep)] text-white" : "bg-black/5 text-zinc-600 hover:bg-black/10") + (!hasGoogleImport ? " opacity-60" : "")}
         >
-          LIVE GOOGLE REVIEWS
+          LIVE GOOGLE REVIEWS {!hasGoogleImport && "🔒"}
         </button>
         <button
           onClick={() => setTab("collected")}
@@ -191,6 +219,53 @@ function Reviews() {
       )}
 
       {tab === "collected" && (
+        <>
+          {hasSentiment ? (
+            <div className="bg-white border border-black/10 rounded-2xl p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="font-black text-lg inline-flex items-center gap-2"><BarChart3 className="w-4 h-4" /> AI Sentiment Summary</h2>
+                <button
+                  onClick={runSentimentAnalysis}
+                  disabled={sentimentBusy}
+                  className="text-xs font-bold border border-black/15 px-3 py-1.5 rounded-full hover:bg-zinc-50 transition disabled:opacity-50 inline-flex items-center gap-1.5"
+                >
+                  {sentimentBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />} Analyze recent reviews
+                </button>
+              </div>
+              {sentimentResult ? (
+                <div className="space-y-3">
+                  <div className="flex h-3 rounded-full overflow-hidden">
+                    <div className="bg-emerald-500" style={{ width: `${sentimentResult.positivePct}%` }} title={`Positive ${sentimentResult.positivePct}%`} />
+                    <div className="bg-zinc-300" style={{ width: `${sentimentResult.neutralPct}%` }} title={`Neutral ${sentimentResult.neutralPct}%`} />
+                    <div className="bg-red-400" style={{ width: `${sentimentResult.negativePct}%` }} title={`Negative ${sentimentResult.negativePct}%`} />
+                  </div>
+                  <div className="flex gap-4 text-xs font-bold">
+                    <span className="text-emerald-700">● {sentimentResult.positivePct}% Positive</span>
+                    <span className="text-zinc-500">● {sentimentResult.neutralPct}% Neutral</span>
+                    <span className="text-red-600">● {sentimentResult.negativePct}% Negative</span>
+                  </div>
+                  <p className="text-sm text-zinc-700">{sentimentResult.summary}</p>
+                  {sentimentResult.topThemes?.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {sentimentResult.topThemes.map((t) => (
+                        <span key={t} className="text-xs font-semibold px-2 py-1 rounded-full bg-zinc-100 text-zinc-600">#{t}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-zinc-400">Analyze your written reviews to see an overall sentiment breakdown and common themes.</p>
+              )}
+            </div>
+          ) : (
+            <div className="bg-white border border-black/10 rounded-2xl p-5 text-center">
+              <p className="text-sm text-zinc-500">
+                <b>Sentiment Analysis + Summary</b> is a Growth+ feature.{" "}
+                <a href="/billing" className="text-[var(--brass-deep)] font-bold underline">Upgrade to unlock →</a>
+              </p>
+            </div>
+          )}
+
         <div className="bg-white border border-black/10 rounded-2xl divide-y divide-black/5">
           {(reviews ?? []).length === 0 && <div className="p-8 text-center text-sm text-zinc-500">No reviews collected yet.</div>}
           {(reviews ?? []).map((r) => (
@@ -216,6 +291,7 @@ function Reviews() {
             </div>
           ))}
         </div>
+        </>
       )}
     </div>
   );
