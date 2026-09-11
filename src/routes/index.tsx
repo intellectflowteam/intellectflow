@@ -12,6 +12,16 @@ import { PublicFooter } from "@/components/PublicPageShell";
 import { BrandLogo } from "@/components/BrandLogo";
 
 export const Route = createFileRoute("/")({
+  loader: async () => {
+    const { data } = await supabase
+      .from("businesses_public")
+      .select("name, city, photo_url, rating, total_reviews, business_type")
+      .not("photo_url", "is", null)
+      .gt("total_reviews", 0)
+      .order("total_reviews", { ascending: false })
+      .limit(12);
+    return { realBusinesses: data ?? [] };
+  },
   head: () => ({
     meta: [
       { title: "IntellectFlow — QR se Google Reviews Automation for Local Shops" },
@@ -53,15 +63,10 @@ const TOOLS = [
   { icon: Star, t: "Multi-Plan Billing", d: "Starter, Growth or Pro — upgrade anytime via Razorpay." },
 ];
 
-const TESTIMONIALS = [
-  { initial: "RB", name: "Rakesh Bhai", shop: "Rakesh Tea Stall • Visavadar", rating: 5, quote: "4.8 se 4.95 rating hui 21 din mein. QR standee lagane ke baad daily 10-12 review aa rahe hain." },
-  { initial: "P", name: "Priya", shop: "Glow Beauty Salon • Junagadh", rating: 5, quote: "Negative reviews ab private aate hain. Google pe sirf 5 star dikhta hai. Bahut acha system." },
-  { initial: "DM", name: "Dr. Mehta", shop: "Mehta Clinic • Rajkot", rating: 5, quote: "AI reply feature time bachata hai. GMB posts auto ho jate hain. Worth every rupee." },
-];
-
 const luxuryEase = [0.16, 1, 0.3, 1] as const;
 
 function Landing() {
+  const { realBusinesses } = Route.useLoaderData();
   const nav = useNavigate();
   const [userLoggedIn, setUserLoggedIn] = useState(false);
 
@@ -107,8 +112,20 @@ function Landing() {
         </div>
       </header>
 
-      {/* 2. HERO SECTION - EXACT LOVABLE APP */}
-      <section className="relative pt-14 md:pt-20 pb-16 text-center z-10">
+      {/* 2. HERO SECTION */}
+      <section className="relative pt-14 md:pt-20 pb-16 text-center z-10 overflow-hidden">
+        <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none" aria-hidden="true">
+          <motion.div
+            className="absolute -top-24 -left-24 w-72 h-72 sm:w-96 sm:h-96 rounded-full bg-gradient-to-br from-orange-300 via-pink-300 to-purple-300 opacity-30 blur-3xl"
+            animate={{ x: [0, 30, 0], y: [0, 20, 0] }}
+            transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+          />
+          <motion.div
+            className="absolute top-10 -right-24 w-72 h-72 sm:w-96 sm:h-96 rounded-full bg-gradient-to-br from-purple-300 via-pink-300 to-orange-200 opacity-30 blur-3xl"
+            animate={{ x: [0, -20, 0], y: [0, 30, 0] }}
+            transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
+          />
+        </div>
         <div className="max-w-[900px] mx-auto px-4 md:px-6 space-y-6">
           <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-amber-100/60 border border-amber-300/60 text-[10px] font-mono font-bold uppercase tracking-widest text-amber-800">
             <span>• 25 TOOLS</span>
@@ -129,7 +146,7 @@ function Landing() {
           <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3 max-w-md mx-auto">
             <Link
               to={userLoggedIn ? "/dashboard" : "/auth"}
-              className="w-full sm:w-auto h-12 px-8 rounded-2xl bg-[#18181B] text-white font-bold text-xs uppercase tracking-wider shadow-lg hover:bg-black transition flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full sm:w-auto h-12 px-8 rounded-2xl bg-gradient-to-r from-orange-500 via-pink-500 to-purple-600 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-pink-500/30 hover:brightness-110 hover:scale-[1.02] transition flex items-center justify-center gap-2 cursor-pointer"
             >
               {userLoggedIn ? "Open Dashboard" : "Start free trial"} <ArrowRight className="w-4 h-4" />
             </Link>
@@ -145,9 +162,9 @@ function Landing() {
           </div>
 
           <div className="pt-6 max-w-md mx-auto">
-            <div className="p-6 rounded-3xl bg-[#F4F3ED] border border-black/10 shadow-xs text-left space-y-4 relative overflow-hidden">
+            <div className="p-6 rounded-3xl bg-white border border-black/10 shadow-lg shadow-pink-500/5 text-left space-y-4 relative overflow-hidden">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-[#18181B] text-white grid place-items-center shrink-0">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-orange-500 via-pink-500 to-purple-600 text-white grid place-items-center shrink-0">
                   <QrCode className="w-6 h-6" />
                 </div>
                 <div>
@@ -192,7 +209,7 @@ function Landing() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: i * 0.08, ease: luxuryEase }}
-              className="p-5 rounded-2xl bg-[#F4F3ED] border border-black/5 flex flex-col justify-between space-y-3"
+              className="p-5 rounded-2xl bg-white border border-black/5 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition duration-300 flex flex-col justify-between space-y-3"
             >
               <div className="font-mono text-amber-800 text-[11px] font-bold tracking-wider">{s.step}</div>
               <div className="font-display font-bold text-base text-[#18181B]">{s.t}</div>
@@ -206,46 +223,47 @@ function Landing() {
         </p>
       </section>
 
-      {/* 4. SECTION 2: HAPPY BUSINESS OWNERS */}
-      <section className="max-w-[1140px] mx-auto px-4 md:px-6 py-16 border-t border-black/5 z-10 relative">
-        <h2 className="text-center font-display font-bold text-3xl md:text-5xl tracking-tight text-[#18181B]">
-          Happy business owners
-        </h2>
-        <p className="text-center text-xs text-[var(--ink-60)] font-medium mt-1">
-          Illustrative example — your first reviews here could be your own customers.
-        </p>
+      {/* 4. SECTION 2: TRUSTED BY REAL BUSINESSES */}
+      {realBusinesses.length > 0 && (
+        <section className="max-w-[1140px] mx-auto px-4 md:px-6 py-16 border-t border-black/5 z-10 relative">
+          <div className="text-center font-mono text-xs font-bold uppercase tracking-widest text-pink-600">
+            REAL CUSTOMERS
+          </div>
+          <h2 className="text-center font-display font-bold text-3xl md:text-5xl tracking-tight mt-2 text-[#18181B]">
+            Trusted by businesses like yours
+          </h2>
+          <p className="text-center text-xs text-[var(--ink-60)] font-medium mt-2">
+            Live from our own platform — real businesses, real Google ratings, updated automatically.
+          </p>
 
-        <div className="mt-12 grid md:grid-cols-3 gap-6">
-          {TESTIMONIALS.map((t, i) => (
-            <motion.div
-              key={t.name}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: i * 0.1, ease: luxuryEase }}
-              className="p-6 rounded-3xl bg-[#F4F3ED] border border-black/5 shadow-2xs flex flex-col justify-between space-y-4"
-            >
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-[#18181B] text-white font-bold text-xs grid place-items-center">
-                    {t.initial}
-                  </div>
-                  <div>
-                    <div className="font-bold text-xs text-[#18181B]">{t.name}</div>
-                    <div className="text-[10px] text-[var(--ink-60)] font-medium">{t.shop}</div>
-                  </div>
-                </div>
+          <div className="mt-12 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+            {realBusinesses.map((b, i) => (
+              <motion.div
+                key={(b.name ?? "business") + i}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.4, delay: i * 0.05, ease: luxuryEase }}
+                className="p-4 rounded-2xl bg-white border border-black/5 shadow-2xs flex flex-col items-center text-center gap-2 hover:shadow-lg hover:-translate-y-1 transition duration-300"
+              >
+                <img
+                  src={b.photo_url ?? ""}
+                  alt={b.name ?? "Business"}
+                  className="w-14 h-14 rounded-full object-cover border-2 border-white shadow-md"
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                />
+                <div className="font-bold text-xs text-[#18181B] leading-tight line-clamp-2">{b.name}</div>
+                {b.city && <div className="text-[10px] text-[var(--ink-60)] font-medium">{b.city}</div>}
                 <div className="flex items-center gap-1 text-amber-500">
-                  {[...Array(t.rating)].map((_, idx) => (
-                    <Star key={idx} className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
-                  ))}
+                  <Star className="w-3 h-3 fill-amber-400 text-amber-500" />
+                  <span className="text-[11px] font-bold text-[#18181B]">{b.rating}</span>
+                  <span className="text-[10px] text-[var(--ink-60)]">({b.total_reviews})</span>
                 </div>
-                <p className="text-xs text-[var(--ink-60)] leading-relaxed font-medium">"{t.quote}"</p>
-              </div>
-            </motion.div>
-          ))}
-        </div>
-      </section>
+              </motion.div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* 5. SECTION 3: 25 TOOLS. ONE PRICE. */}
       <section className="max-w-[1140px] mx-auto px-4 md:px-6 py-16 border-t border-black/5 z-10 relative">
@@ -264,9 +282,9 @@ function Landing() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.4, delay: (i % 6) * 0.05, ease: luxuryEase }}
-              className="p-4 rounded-2xl bg-[#F4F3ED] border border-black/5 flex items-start gap-3.5 hover:border-black/20 transition duration-200"
+              className="p-4 rounded-2xl bg-white border border-black/5 flex items-start gap-3.5 hover:border-pink-300 hover:shadow-lg hover:-translate-y-0.5 transition duration-300"
             >
-              <span className="w-9 h-9 rounded-full bg-[#18181B] text-white grid place-items-center shrink-0 shadow-xs">
+              <span className="w-9 h-9 rounded-full bg-gradient-to-br from-orange-500 via-pink-500 to-purple-600 text-white grid place-items-center shrink-0 shadow-xs">
                 <f.icon className="w-4 h-4" />
               </span>
               <div className="min-w-0">
@@ -308,8 +326,8 @@ function Landing() {
             { num: "3", t: "Standee counter pe rakho", d: "Free printed standee seedha aapke shop par shipped." },
             { num: "4", t: "Reviews aana shuru", d: "5★ → Google, 1–3★ → aapki private inbox." },
           ].map((st) => (
-            <div key={st.num} className="p-6 rounded-2xl bg-[#F4F3ED] border border-black/5 space-y-3">
-              <div className="w-8 h-8 rounded-full bg-[#18181B] text-white font-bold text-xs grid place-items-center">
+            <div key={st.num} className="p-6 rounded-2xl bg-white border border-black/5 shadow-sm hover:shadow-lg transition duration-300 space-y-3">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 via-pink-500 to-purple-600 text-white font-bold text-xs grid place-items-center">
                 {st.num}
               </div>
               <div className="font-display font-bold text-base text-[#18181B]">{st.t}</div>
@@ -337,7 +355,7 @@ function Landing() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.4, delay: i * 0.08, ease: luxuryEase }}
-              className="p-5 rounded-2xl bg-[#F4F3ED] border border-black/5"
+              className="p-5 rounded-2xl bg-white border border-black/5 shadow-sm"
             >
               <div className="font-bold text-sm text-[#18181B]">{f.q}</div>
               <p className="mt-1.5 text-xs text-[var(--ink-60)] leading-relaxed font-medium">{f.a}</p>
@@ -376,14 +394,14 @@ function PlanCard({ plan, index }: { plan: Plan; index: number }) {
       viewport={{ once: true }}
       transition={{ duration: 0.5, delay: index * 0.1, ease: luxuryEase }}
       className={[
-        "rounded-3xl p-7 flex flex-col bg-[#F4F3ED] border transition duration-300 relative",
-        plan.popular ? "border-2 border-amber-600 shadow-lg" : "border-black/5 shadow-2xs",
+        "rounded-3xl p-7 flex flex-col bg-white border transition duration-300 relative hover:-translate-y-1 hover:shadow-2xl",
+        plan.popular ? "border-2 border-pink-500 shadow-xl shadow-pink-500/20" : "border-black/5 shadow-sm",
       ].join(" ")}
     >
       <div className="flex items-center justify-between flex-wrap gap-2">
         <span className="text-xl font-display font-bold tracking-tight text-[#18181B]">{plan.label}</span>
         {badgeLabel && (
-          <span className="bg-[#18181B] text-white text-[10px] font-mono font-bold tracking-wider px-2.5 py-0.5 rounded-full uppercase">
+          <span className="bg-gradient-to-r from-orange-500 via-pink-500 to-purple-600 text-white text-[10px] font-mono font-bold tracking-wider px-2.5 py-0.5 rounded-full uppercase">
             {badgeLabel}
           </span>
         )}
@@ -414,7 +432,8 @@ function PlanCard({ plan, index }: { plan: Plan; index: number }) {
 
       <Link
         to="/auth"
-        className="mt-8 h-12 rounded-2xl bg-[#18181B] text-white font-mono uppercase tracking-wider text-xs font-bold hover:bg-black transition grid place-items-center cursor-pointer shadow-md"
+        search={{ mode: "signup" }}
+        className="mt-8 h-12 rounded-2xl bg-gradient-to-r from-orange-500 via-pink-500 to-purple-600 text-white font-mono uppercase tracking-wider text-xs font-bold hover:brightness-110 transition grid place-items-center cursor-pointer shadow-lg shadow-pink-500/20"
       >
         Get Started at ₹{plan.price}/mo
       </Link>
