@@ -6,7 +6,8 @@ import { getMyBusiness, getMyProfile } from "@/lib/queries";
 import { computeAccess, planHasFeature, type PlanId } from "@/lib/plans";
 import { parseLimit } from "@/lib/plan-limits";
 import { toast } from "sonner";
-import { Send, Loader2, Info, Users } from "lucide-react";
+import { Send, Loader2, Info, Users, Upload } from "lucide-react";
+import Papa from "papaparse";
 
 export const Route = createFileRoute("/_authenticated/whatsapp")({ component: WA });
 
@@ -54,6 +55,51 @@ function WA() {
       return unique;
     },
   });
+
+  const [uploadedCustomers, setUploadedCustomers] = useState<{ name: string | null; phone: string }[]>([]);
+  const allCustomers = (() => {
+    const seen = new Set<string>();
+    const merged: { name: string | null; phone: string }[] = [];
+    for (const c of [...(customers ?? []), ...uploadedCustomers]) {
+      if (!seen.has(c.phone)) {
+        seen.add(c.phone);
+        merged.push(c);
+      }
+    }
+    return merged;
+  })();
+
+  const handleCsvUpload = (file: File) => {
+    Papa.parse<Record<string, string>>(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (result) => {
+        const rows = result.data;
+        const parsed: { name: string | null; phone: string }[] = [];
+        for (const row of rows) {
+          // Accept common column name variants for phone/name.
+          const phoneKey = Object.keys(row).find((k) => /phone|mobile|number|contact/i.test(k));
+          const nameKey = Object.keys(row).find((k) => /name/i.test(k));
+          const rawPhone = phoneKey ? row[phoneKey] : Object.values(row)[0];
+          const phone = (rawPhone || "").replace(/[^\d+]/g, "").trim();
+          if (phone.length >= 10) {
+            parsed.push({ name: nameKey ? row[nameKey] : null, phone });
+          }
+        }
+        if (!parsed.length) {
+          toast.error("No valid phone numbers found in that CSV");
+          return;
+        }
+        setUploadedCustomers((prev) => {
+          const seen = new Set(prev.map((p) => p.phone));
+          const additions = parsed.filter((p) => !seen.has(p.phone));
+          return [...prev, ...additions];
+        });
+        toast.success(`Loaded ${parsed.length} contacts from CSV`);
+      },
+      error: () => toast.error("Could not read that CSV file"),
+    });
+  };
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState("");
@@ -124,10 +170,22 @@ function WA() {
           </div>
 
           <div>
-            <label className="text-xs font-bold text-zinc-600">Select customers ({selected.size}/{remaining === Infinity ? "∞" : remaining})</label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-zinc-600">Select customers ({selected.size}/{remaining === Infinity ? "\u221E" : remaining})</label>
+              <label className="text-xs font-bold text-[var(--brass-deep)] cursor-pointer inline-flex items-center gap-1">
+                <Upload className="w-3.5 h-3.5" /> Upload CSV
+                <input
+                  type="file"
+                  accept=".csv"
+                  className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleCsvUpload(f); e.target.value = ""; }}
+                />
+              </label>
+            </div>
+            <p className="text-[11px] text-zinc-400 mt-0.5">CSV needs a column with phone numbers (and optionally a name column) — for a bulk review-request campaign to a customer list beyond just past reviewers.</p>
             <div className="mt-1 max-h-48 overflow-y-auto border border-black/10 rounded-lg divide-y divide-black/5">
-              {(customers ?? []).length === 0 && <div className="p-4 text-sm text-zinc-400 text-center">No customer phone numbers collected yet.</div>}
-              {(customers ?? []).map((c) => (
+              {allCustomers.length === 0 && <div className="p-4 text-sm text-zinc-400 text-center">No customers yet — collect reviews or upload a CSV.</div>}
+              {allCustomers.map((c) => (
                 <label key={c.phone} className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-zinc-50">
                   <input type="checkbox" checked={selected.has(c.phone)} onChange={() => toggle(c.phone)} className="accent-[var(--brass)]" />
                   <span className="font-medium">{c.name || "Customer"}</span>
@@ -137,6 +195,16 @@ function WA() {
             </div>
           </div>
 
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold text-zinc-600">Message</label>
+            <button
+              type="button"
+              onClick={() => setMessage(`Hi! Thanks for visiting ${biz?.name ?? "us"}. We'd love it if you could share your experience: ${typeof window !== "undefined" ? window.location.origin : ""}/r/${biz?.slug ?? ""} 🙏`)}
+              className="text-[11px] font-bold text-[var(--brass-deep)]"
+            >
+              Use review-request template
+            </button>
+          </div>
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
