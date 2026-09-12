@@ -10,7 +10,7 @@ import { getPlaceDetails } from "@/lib/places.functions";
 import { aiReply, sentimentSummary } from "@/lib/ai.functions";
 import { parseBusinessMeta } from "@/lib/utils";
 import { PlaceSearchInput } from "@/components/PlaceSearchInput";
-import { Star, Loader2, RefreshCw, ExternalLink, Sparkles, Copy, Search, MapPin, BarChart3 } from "lucide-react";
+import { Star, Loader2, RefreshCw, ExternalLink, Sparkles, Copy, Search, MapPin, BarChart3, Download } from "lucide-react";
 
 
 export const Route = createFileRoute("/_authenticated/reviews")({
@@ -46,6 +46,32 @@ function Reviews() {
   });
 
   const hasSentiment = planHasFeature(effectivePlan, "Sentiment Analysis + Summary");
+
+  const exportReviewsCsv = () => {
+    const rows = reviews ?? [];
+    const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const header = ["Date", "Customer Name", "Phone", "Rating", "Review Text", "Owner Reply", "Status"];
+    const lines = [header.join(",")];
+    for (const r of rows) {
+      lines.push([
+        esc(r.created_at ? new Date(r.created_at).toLocaleString() : ""),
+        esc(r.customer_name),
+        esc(r.customer_phone),
+        esc(r.rating),
+        esc(r.review_text),
+        esc(r.owner_reply),
+        esc(r.status),
+      ].join(","));
+    }
+    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${biz?.slug ?? "reviews"}-export-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${rows.length} reviews`);
+  };
   const sentimentFn = useServerFn(sentimentSummary);
   const [sentimentResult, setSentimentResult] = useState<{
     positivePct: number; neutralPct: number; negativePct: number; summary: string; topThemes: string[];
@@ -99,6 +125,11 @@ function Reviews() {
         {tab === "google" && (
           <button onClick={() => google.refetch()} className="h-9 px-3 rounded-lg border border-black/15 bg-white text-sm font-semibold inline-flex items-center gap-1.5">
             <RefreshCw className={"w-4 h-4 " + (google.isFetching ? "animate-spin" : "")} /> Refresh Reviews
+          </button>
+        )}
+        {tab === "collected" && (reviews ?? []).length > 0 && (
+          <button onClick={exportReviewsCsv} className="h-9 px-3 rounded-lg border border-black/15 bg-white text-sm font-semibold inline-flex items-center gap-1.5">
+            <Download className="w-4 h-4" /> Export CSV
           </button>
         )}
       </div>

@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { NewReviewNotifier } from "@/components/NewReviewNotifier";
 import { parseBusinessMeta, cleanDescription } from "@/lib/utils";
 import { checkMyKeywordRankings } from "@/lib/rankings.functions";
+import { computeBestTimeToPost } from "@/lib/best-time";
 import { computeSeoHealth } from "@/lib/seo-score";
 import { SeoHealthCard } from "@/components/SeoHealthCard";
 
@@ -36,6 +37,7 @@ function Dashboard() {
   const access = computeAccess(profile);
   const effectivePlan: PlanId = access.lifetimeFree || access.onTrial ? "pro" : access.plan;
   const hasRankTracker = planHasFeature(effectivePlan, "Local Rank Tracker vs competitors");
+  const hasBestTime = planHasFeature(effectivePlan, "Best Time to Ask + Post");
 
   const { data: reviews } = useQuery({
     queryKey: ["dash-reviews", biz?.id],
@@ -134,6 +136,7 @@ function Dashboard() {
 
   const publicUrl = `${window.location.origin}/r/${biz.slug}`;
   const list = reviews ?? [];
+  const bestTime = hasBestTime ? computeBestTimeToPost(list.map((r) => r.created_at).filter((c): c is string => !!c)) : null;
 
   // ---- Analytics ----
   const now = Date.now();
@@ -189,27 +192,35 @@ function Dashboard() {
         </div>
       ) : null}
 
-      {/* Alerts (rating drops + negative reviews) */}
+      {/* Alerts (rating drops, negative reviews, and hyperlocal opportunities) */}
       {!!(alerts ?? []).length && (
         <div className="space-y-2">
-          {(alerts ?? []).map((a) => (
-            <div
-              key={a.id}
-              className={[
-                "rounded-2xl border p-4 flex items-start gap-3",
-                a.severity === "critical" ? "border-red-200 bg-red-50" : "border-orange-200 bg-orange-50",
-              ].join(" ")}
-            >
-              <AlertTriangle className={"w-5 h-5 shrink-0 mt-0.5 " + (a.severity === "critical" ? "text-red-600" : "text-orange-600")} />
-              <div className="flex-1 min-w-0">
-                <div className={"text-sm font-bold " + (a.severity === "critical" ? "text-red-900" : "text-orange-900")}>{a.title}</div>
-                <p className="text-sm text-zinc-600 mt-0.5">{a.message}</p>
+          {(alerts ?? []).map((a) => {
+            const isOpportunity = a.type === "hyperlocal_opportunity" || a.severity === "info";
+            const colorClass = a.severity === "critical" ? "red" : isOpportunity ? "blue" : "orange";
+            return (
+              <div
+                key={a.id}
+                className={[
+                  "rounded-2xl border p-4 flex items-start gap-3",
+                  colorClass === "red" ? "border-red-200 bg-red-50" : colorClass === "blue" ? "border-blue-200 bg-blue-50" : "border-orange-200 bg-orange-50",
+                ].join(" ")}
+              >
+                {isOpportunity ? (
+                  <Sparkles className="w-5 h-5 shrink-0 mt-0.5 text-blue-600" />
+                ) : (
+                  <AlertTriangle className={"w-5 h-5 shrink-0 mt-0.5 " + (colorClass === "red" ? "text-red-600" : "text-orange-600")} />
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className={"text-sm font-bold " + (colorClass === "red" ? "text-red-900" : colorClass === "blue" ? "text-blue-900" : "text-orange-900")}>{a.title}</div>
+                  <p className="text-sm text-zinc-600 mt-0.5">{a.message}</p>
+                </div>
+                <button onClick={() => dismissAlert(a.id)} className="p-1 rounded hover:bg-black/5 text-zinc-400 shrink-0">
+                  <X className="w-4 h-4" />
+                </button>
               </div>
-              <button onClick={() => dismissAlert(a.id)} className="p-1 rounded hover:bg-black/5 text-zinc-400 shrink-0">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -363,6 +374,19 @@ function Dashboard() {
         <Stat icon={QrCode} label="QR scans" value={biz.total_scans ?? 0} />
         <Stat icon={TrendingUp} label="Reviews (30d)" value={last30.length} />
       </div>
+
+      {hasBestTime && bestTime && (
+        <div className="ticket-card p-5 flex items-start gap-3">
+          <span className="w-10 h-10 rounded-xl bg-gradient-to-br from-[var(--brass)] to-[var(--brass-deep)] text-white grid place-items-center shrink-0">
+            <Clock className="w-5 h-5" />
+          </span>
+          <div>
+            <h2 className="font-black text-sm sm:text-base tracking-tight">Best Time to Ask &amp; Post</h2>
+            <p className="text-sm text-zinc-600 mt-1">{bestTime.insight}</p>
+            <p className="text-[11px] text-zinc-400 mt-1">Based on {bestTime.totalAnalyzed} real reviews collected so far.</p>
+          </div>
+        </div>
+      )}
 
       {/* Charts + QR */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">

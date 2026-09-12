@@ -1,0 +1,23 @@
+name: Weekly PDF report
+
+on:
+  schedule:
+    # Every Monday at 04:00 UTC (~09:30 IST)
+    - cron: "0 4 * * 1"
+  workflow_dispatch: {}
+
+jobs:
+  weekly-pdf-report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call weekly-pdf-report endpoint
+        run: |
+          status=$(curl -s -o response.json -w "%{http_code}" -X POST \
+            -H "x-cron-key: ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/public/weekly-pdf-report")
+          echo "HTTP status: $status"
+          cat response.json
+          if [ "$status" -ge 300 ]; then
+            echo "Weekly PDF report failed"
+            exit 1
+          fi

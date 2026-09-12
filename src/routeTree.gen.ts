@@ -35,11 +35,13 @@ import { Route as AuthenticatedStandeesRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedWhatsappRouteImport } from './routes/_authenticated/whatsapp'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as RSlugRouteImport } from './routes/r.$slug'
+import { Route as ApiPublicHyperlocalOpportunityAlertRouteImport } from './routes/api/public/hyperlocal-opportunity-alert'
 import { Route as ApiPublicKeywordRankCheckRouteImport } from './routes/api/public/keyword-rank-check'
 import { Route as ApiPublicRatingDropAlertRouteImport } from './routes/api/public/rating-drop-alert'
 import { Route as ApiPublicRazorpayWebhookRouteImport } from './routes/api/public/razorpay-webhook'
 import { Route as ApiPublicSubmitReviewRouteImport } from './routes/api/public/submit-review'
 import { Route as ApiPublicWeeklyDataRefreshRouteImport } from './routes/api/public/weekly-data-refresh'
+import { Route as ApiPublicWeeklyPdfReportRouteImport } from './routes/api/public/weekly-pdf-report'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -170,6 +172,12 @@ const RSlugRoute = RSlugRouteImport.update({
   path: '/r/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHyperlocalOpportunityAlertRoute =
+  ApiPublicHyperlocalOpportunityAlertRouteImport.update({
+    id: '/api/public/hyperlocal-opportunity-alert',
+    path: '/api/public/hyperlocal-opportunity-alert',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicKeywordRankCheckRoute =
   ApiPublicKeywordRankCheckRouteImport.update({
     id: '/api/public/keyword-rank-check',
@@ -199,6 +207,12 @@ const ApiPublicWeeklyDataRefreshRoute =
     path: '/api/public/weekly-data-refresh',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicWeeklyPdfReportRoute =
+  ApiPublicWeeklyPdfReportRouteImport.update({
+    id: '/api/public/weekly-pdf-report',
+    path: '/api/public/weekly-pdf-report',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -225,11 +239,13 @@ export interface FileRoutesByFullPath {
   '/whatsapp': typeof AuthenticatedWhatsappRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/r/$slug': typeof RSlugRoute
+  '/api/public/hyperlocal-opportunity-alert': typeof ApiPublicHyperlocalOpportunityAlertRoute
   '/api/public/keyword-rank-check': typeof ApiPublicKeywordRankCheckRoute
   '/api/public/rating-drop-alert': typeof ApiPublicRatingDropAlertRoute
   '/api/public/razorpay-webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/public/submit-review': typeof ApiPublicSubmitReviewRoute
   '/api/public/weekly-data-refresh': typeof ApiPublicWeeklyDataRefreshRoute
+  '/api/public/weekly-pdf-report': typeof ApiPublicWeeklyPdfReportRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -256,11 +272,13 @@ export interface FileRoutesByTo {
   '/whatsapp': typeof AuthenticatedWhatsappRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/r/$slug': typeof RSlugRoute
+  '/api/public/hyperlocal-opportunity-alert': typeof ApiPublicHyperlocalOpportunityAlertRoute
   '/api/public/keyword-rank-check': typeof ApiPublicKeywordRankCheckRoute
   '/api/public/rating-drop-alert': typeof ApiPublicRatingDropAlertRoute
   '/api/public/razorpay-webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/public/submit-review': typeof ApiPublicSubmitReviewRoute
   '/api/public/weekly-data-refresh': typeof ApiPublicWeeklyDataRefreshRoute
+  '/api/public/weekly-pdf-report': typeof ApiPublicWeeklyPdfReportRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -290,11 +308,13 @@ export interface FileRoutesById {
   '/_authenticated/whatsapp': typeof AuthenticatedWhatsappRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/r/$slug': typeof RSlugRoute
+  '/api/public/hyperlocal-opportunity-alert': typeof ApiPublicHyperlocalOpportunityAlertRoute
   '/api/public/keyword-rank-check': typeof ApiPublicKeywordRankCheckRoute
   '/api/public/rating-drop-alert': typeof ApiPublicRatingDropAlertRoute
   '/api/public/razorpay-webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/public/submit-review': typeof ApiPublicSubmitReviewRoute
   '/api/public/weekly-data-refresh': typeof ApiPublicWeeklyDataRefreshRoute
+  '/api/public/weekly-pdf-report': typeof ApiPublicWeeklyPdfReportRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -323,11 +343,13 @@ export interface FileRouteTypes {
     | '/whatsapp'
     | '/auth/callback'
     | '/r/$slug'
+    | '/api/public/hyperlocal-opportunity-alert'
     | '/api/public/keyword-rank-check'
     | '/api/public/rating-drop-alert'
     | '/api/public/razorpay-webhook'
     | '/api/public/submit-review'
     | '/api/public/weekly-data-refresh'
+    | '/api/public/weekly-pdf-report'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -354,11 +376,13 @@ export interface FileRouteTypes {
     | '/whatsapp'
     | '/auth/callback'
     | '/r/$slug'
+    | '/api/public/hyperlocal-opportunity-alert'
     | '/api/public/keyword-rank-check'
     | '/api/public/rating-drop-alert'
     | '/api/public/razorpay-webhook'
     | '/api/public/submit-review'
     | '/api/public/weekly-data-refresh'
+    | '/api/public/weekly-pdf-report'
   id:
     | '__root__'
     | '/'
@@ -387,11 +411,13 @@ export interface FileRouteTypes {
     | '/_authenticated/whatsapp'
     | '/auth/callback'
     | '/r/$slug'
+    | '/api/public/hyperlocal-opportunity-alert'
     | '/api/public/keyword-rank-check'
     | '/api/public/rating-drop-alert'
     | '/api/public/razorpay-webhook'
     | '/api/public/submit-review'
     | '/api/public/weekly-data-refresh'
+    | '/api/public/weekly-pdf-report'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -408,11 +434,13 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   TermsOfServiceRoute: typeof TermsOfServiceRoute
   RSlugRoute: typeof RSlugRoute
+  ApiPublicHyperlocalOpportunityAlertRoute: typeof ApiPublicHyperlocalOpportunityAlertRoute
   ApiPublicKeywordRankCheckRoute: typeof ApiPublicKeywordRankCheckRoute
   ApiPublicRatingDropAlertRoute: typeof ApiPublicRatingDropAlertRoute
   ApiPublicRazorpayWebhookRoute: typeof ApiPublicRazorpayWebhookRoute
   ApiPublicSubmitReviewRoute: typeof ApiPublicSubmitReviewRoute
   ApiPublicWeeklyDataRefreshRoute: typeof ApiPublicWeeklyDataRefreshRoute
+  ApiPublicWeeklyPdfReportRoute: typeof ApiPublicWeeklyPdfReportRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -599,6 +627,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hyperlocal-opportunity-alert': {
+      id: '/api/public/hyperlocal-opportunity-alert'
+      path: '/api/public/hyperlocal-opportunity-alert'
+      fullPath: '/api/public/hyperlocal-opportunity-alert'
+      preLoaderRoute: typeof ApiPublicHyperlocalOpportunityAlertRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/keyword-rank-check': {
       id: '/api/public/keyword-rank-check'
       path: '/api/public/keyword-rank-check'
@@ -632,6 +667,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/weekly-data-refresh'
       fullPath: '/api/public/weekly-data-refresh'
       preLoaderRoute: typeof ApiPublicWeeklyDataRefreshRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/weekly-pdf-report': {
+      id: '/api/public/weekly-pdf-report'
+      path: '/api/public/weekly-pdf-report'
+      fullPath: '/api/public/weekly-pdf-report'
+      preLoaderRoute: typeof ApiPublicWeeklyPdfReportRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -704,11 +746,14 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   TermsOfServiceRoute: TermsOfServiceRoute,
   RSlugRoute: RSlugRoute,
+  ApiPublicHyperlocalOpportunityAlertRoute:
+    ApiPublicHyperlocalOpportunityAlertRoute,
   ApiPublicKeywordRankCheckRoute: ApiPublicKeywordRankCheckRoute,
   ApiPublicRatingDropAlertRoute: ApiPublicRatingDropAlertRoute,
   ApiPublicRazorpayWebhookRoute: ApiPublicRazorpayWebhookRoute,
   ApiPublicSubmitReviewRoute: ApiPublicSubmitReviewRoute,
   ApiPublicWeeklyDataRefreshRoute: ApiPublicWeeklyDataRefreshRoute,
+  ApiPublicWeeklyPdfReportRoute: ApiPublicWeeklyPdfReportRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

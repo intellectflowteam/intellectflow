@@ -1,0 +1,22 @@
+name: Weekly hyperlocal opportunity alert
+
+on:
+  schedule:
+    - cron: "30 3 * * 1"
+  workflow_dispatch: {}
+
+jobs:
+  hyperlocal-alert:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call hyperlocal-opportunity-alert endpoint
+        run: |
+          status=$(curl -s -o response.json -w "%{http_code}" -X POST \
+            -H "x-cron-key: ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/public/hyperlocal-opportunity-alert")
+          echo "HTTP status: $status"
+          cat response.json
+          if [ "$status" -ge 300 ]; then
+            echo "Hyperlocal opportunity alert failed"
+            exit 1
+          fi
