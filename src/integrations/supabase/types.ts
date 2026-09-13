@@ -442,6 +442,9 @@ export type Database = {
           plan_price: number | null
           razorpay_payment_ref: string | null
           razorpay_plan_id: string | null
+          referral_code: string | null
+          referral_reward_granted: boolean
+          referred_by: string | null
           subscription_status: string
           trial_ends_at: string | null
         }
@@ -460,6 +463,9 @@ export type Database = {
           plan_price?: number | null
           razorpay_payment_ref?: string | null
           razorpay_plan_id?: string | null
+          referral_code?: string | null
+          referral_reward_granted?: boolean
+          referred_by?: string | null
           subscription_status?: string
           trial_ends_at?: string | null
         }
@@ -478,6 +484,9 @@ export type Database = {
           plan_price?: number | null
           razorpay_payment_ref?: string | null
           razorpay_plan_id?: string | null
+          referral_code?: string | null
+          referral_reward_granted?: boolean
+          referred_by?: string | null
           subscription_status?: string
           trial_ends_at?: string | null
         }

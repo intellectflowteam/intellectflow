@@ -3,9 +3,11 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { getMyBusiness, getMyProfile } from "@/lib/queries";
 import { useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Plus, X, Edit2, Check, Sparkles, TrendingUp, Search, Award, RefreshCw } from "lucide-react";
+import { Plus, X, Edit2, Check, Sparkles, TrendingUp, Search, Award, RefreshCw, Gift, Copy, Users } from "lucide-react";
 import { parseBusinessMeta, cleanDescription, formatDescriptionWithMeta, estimateKeywordRank } from "@/lib/utils";
+import { getOrCreateReferralCode, getMyReferralStats } from "@/lib/referral.functions";
 
 export const Route = createFileRoute("/_authenticated/settings")({ component: Settings });
 
@@ -13,6 +15,19 @@ function Settings() {
   const { data: biz } = useQuery({ queryKey: ["biz"], queryFn: getMyBusiness });
   const { data: profile } = useQuery({ queryKey: ["profile"], queryFn: getMyProfile });
   const qc = useQueryClient();
+
+  const getCodeFn = useServerFn(getOrCreateReferralCode);
+  const getStatsFn = useServerFn(getMyReferralStats);
+  const { data: referralCode } = useQuery({
+    queryKey: ["referral-code"],
+    queryFn: async () => (await getCodeFn({})).code,
+    staleTime: Infinity,
+  });
+  const { data: referralStats } = useQuery({
+    queryKey: ["referral-stats"],
+    queryFn: async () => getStatsFn({}),
+  });
+  const referralLink = referralCode && typeof window !== "undefined" ? `${window.location.origin}/auth?ref=${referralCode}` : "";
 
   const [form, setForm] = useState({
     name: "",
@@ -158,7 +173,47 @@ function Settings() {
         <p className="text-xs font-mono text-zinc-500 mt-1">Manage target keywords, AI preferences, and track live Google Search ranking performance.</p>
       </div>
 
-      {/* Target SEO Keywords Tag Manager */}
+      {/* Referral Program */}
+      <div className="bg-white border border-[rgba(20,17,14,0.12)] rounded-3xl p-5 md:p-6 shadow-xs space-y-4">
+        <div className="flex items-center gap-2">
+          <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-[var(--brass)] to-[var(--brass-deep)] text-white grid place-items-center shrink-0">
+            <Gift className="w-4.5 h-4.5" />
+          </span>
+          <div>
+            <h2 className="font-black text-base text-[var(--ink)]">Refer a business</h2>
+            <p className="text-xs text-zinc-500">Share your link — once someone you refer sets up their business, contact us to redeem your reward.</p>
+          </div>
+        </div>
+
+        {referralLink ? (
+          <div className="flex items-center gap-2">
+            <div className="flex-1 min-w-0 h-11 rounded-lg border border-black/15 px-3 text-sm flex items-center truncate font-mono">{referralLink}</div>
+            <button
+              onClick={() => { navigator.clipboard.writeText(referralLink); toast.success("Referral link copied"); }}
+              className="h-11 px-3 rounded-lg border border-black/15 shrink-0"
+              aria-label="Copy referral link"
+            >
+              <Copy className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          <div className="h-11 rounded-lg bg-zinc-100 animate-pulse" />
+        )}
+
+        <div className="flex items-center gap-6 text-sm">
+          <div className="flex items-center gap-1.5">
+            <Users className="w-4 h-4 text-zinc-400" />
+            <span className="font-bold text-[var(--ink)]">{referralStats?.totalReferred ?? 0}</span>
+            <span className="text-zinc-500">signed up</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Check className="w-4 h-4 text-emerald-500" />
+            <span className="font-bold text-[var(--ink)]">{referralStats?.converted ?? 0}</span>
+            <span className="text-zinc-500">completed setup</span>
+          </div>
+        </div>
+      </div>
+
       <div className="bg-white border border-[rgba(20,17,14,0.12)] rounded-3xl p-5 md:p-6 shadow-xs space-y-5">
         <div className="flex items-center justify-between flex-wrap gap-2 pb-3 border-b border-black/5">
           <div>

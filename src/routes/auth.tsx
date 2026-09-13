@@ -38,6 +38,19 @@ function AuthPage() {
   const [remember, setRemember] = useState(true);
   const [emailStatus, setEmailStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
 
+  // Referral capture — if someone arrived via a referral link (?ref=CODE),
+  // remember it through the OTP verification step so we can attribute the
+  // new account to the referrer once signup completes.
+  const [referralCode] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    const fromUrl = new URLSearchParams(window.location.search).get("ref");
+    if (fromUrl) {
+      sessionStorage.setItem("pending_referral_code", fromUrl.toUpperCase());
+      return fromUrl.toUpperCase();
+    }
+    return sessionStorage.getItem("pending_referral_code");
+  });
+
   // OTP Verification Step State
   const [showOtpStep, setShowOtpStep] = useState(false);
 
@@ -283,6 +296,20 @@ function AuthPage() {
 
       clearDeviceAttempts("signup", cleanEmail);
       clearDeviceAttempts("otp_resend", cleanEmail);
+
+      // Attribute this signup to whoever referred them, if a valid code was
+      // captured. Best-effort — never blocks or fails the signup itself.
+      if (referralCode) {
+        try {
+          const { applyReferralCode } = await import("@/lib/referral.functions");
+          await applyReferralCode({ data: { code: referralCode } });
+        } catch {
+          /* referral attribution is a nice-to-have, never block signup on it */
+        } finally {
+          sessionStorage.removeItem("pending_referral_code");
+        }
+      }
+
       toast.success("Email verified & account created!");
       setTimeout(() => {
         nav({ to: "/onboarding" });

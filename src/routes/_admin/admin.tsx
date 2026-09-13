@@ -107,7 +107,7 @@ function AdminCRM() {
     queryFn: async () => {
       let query = supabase
         .from("profiles")
-        .select("id, email, business_name, phone, city, plan, plan_price, is_admin, is_founder_free, lifetime_free, subscription_status, trial_ends_at, last_active_at, created_at, businesses(*)")
+        .select("id, email, business_name, phone, city, plan, plan_price, is_admin, is_founder_free, lifetime_free, subscription_status, trial_ends_at, last_active_at, created_at, referral_code, referred_by, referral_reward_granted, businesses(*)")
         .order("created_at", { ascending: false })
         .limit(300);
       if (q) query = query.or(`email.ilike.%${q}%,business_name.ilike.%${q}%,phone.ilike.%${q}%,city.ilike.%${q}%`);
@@ -522,6 +522,7 @@ function UserFullDashboardView({
 }) {
   const b = Array.isArray(user.businesses) ? user.businesses[0] : null;
   const [activeModal, setActiveModal] = useState<"reviews" | "competitors" | "faqs" | "gmb" | "qr" | "location" | null>(null);
+  const referrer = user.referred_by ? allUsers.find((u) => u.id === user.referred_by) : null;
 
   // Fetch reviews for this inspected user's shop
   const { data: userReviews } = useQuery({
@@ -669,6 +670,23 @@ function UserFullDashboardView({
             </select>
           </div>
         </div>
+
+        {referrer && (
+          <div className="flex items-center justify-between gap-2 bg-purple-50 border border-purple-200 rounded-xl px-3.5 py-2 text-xs">
+            <span className="text-purple-900">
+              Referred by <b>{referrer.business_name || referrer.email}</b> ({referrer.email})
+              {user.referral_reward_granted && <span className="ml-2 text-emerald-700 font-bold">✓ Reward granted</span>}
+            </span>
+            {!user.referral_reward_granted && (
+              <button
+                onClick={() => onUpdateProfile(user.id, { referral_reward_granted: true } as any)}
+                className="text-purple-700 font-bold underline shrink-0"
+              >
+                Mark referrer rewarded
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Quick Admin Overrides */}
         <div className="flex items-center gap-2">
@@ -1246,7 +1264,7 @@ function AdminOnboard() {
     queryKey: ["admin-onboard-users", userQ],
     queryFn: async () => {
       const [{ data: profs }, { data: biz }] = await Promise.all([
-        supabase.from("profiles").select("id, email, business_name, phone, city, created_at").order("created_at", { ascending: false }).limit(200),
+        supabase.from("profiles").select("id, email, business_name, phone, city, created_at, referral_code, referred_by, referral_reward_granted").order("created_at", { ascending: false }).limit(200),
         supabase.from("businesses").select("user_id"),
       ]);
       const taken = new Set((biz ?? []).map((b) => b.user_id));
