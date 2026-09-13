@@ -2,6 +2,7 @@ import { createFileRoute, Outlet, redirect, Link, useRouterState, useNavigate } 
 import { supabase } from "@/integrations/supabase/client";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { LayoutDashboard, MessageSquare, Sparkles, TrendingUp, MessageCircle, Users, Image, QrCode, Settings, CreditCard, LogOut, Menu, X, HelpCircle, Search } from "lucide-react";
+import { NotificationBell } from "@/components/NotificationBell";
 import { BrandLogo } from "@/components/BrandLogo";
 import { useEffect, useState } from "react";
 
@@ -114,6 +115,9 @@ function Shell() {
         <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-black/5 h-14 flex items-center px-4 gap-3">
           <button onClick={() => setOpen(true)} className="md:hidden p-1"><Menu className="w-5 h-5" /></button>
           <div className="text-sm font-semibold text-zinc-500">IntellectFlow Console</div>
+          <div className="ml-auto">
+            <NotificationBell />
+          </div>
         </header>
         <main className="p-4 md:p-6 max-w-6xl mx-auto pb-20 md:pb-6">
           <Outlet />

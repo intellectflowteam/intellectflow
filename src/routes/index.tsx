@@ -249,6 +249,8 @@ function Landing() {
                 <img
                   src={b.photo_url ?? ""}
                   alt={b.name ?? "Business"}
+                  loading="lazy"
+                  decoding="async"
                   className="w-14 h-14 rounded-full object-cover border-2 border-white shadow-md"
                   onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
                 />
