@@ -1,6 +1,29 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
+/** Raises a real, specific NAP (Name/Address/Phone) consistency alert when
+ * this business's live Google listing disagrees with what's stored in the
+ * app — de-duped so it doesn't re-raise every week for the same unresolved
+ * discrepancy. */
+async function raiseNapAlert(supabaseAdmin: any, businessId: string, field: string, ours: string, google: string) {
+  const { data: existing } = await supabaseAdmin
+    .from("alerts")
+    .select("id")
+    .eq("business_id", businessId)
+    .eq("type", "nap_mismatch")
+    .ilike("message", `%${field}%`)
+    .eq("is_read", false)
+    .limit(1);
+  if (existing?.length) return;
+  await supabaseAdmin.from("alerts").insert({
+    business_id: businessId,
+    type: "nap_mismatch",
+    severity: "warning",
+    title: `${field.charAt(0).toUpperCase() + field.slice(1)} mismatch with Google`,
+    message: `Your saved ${field} ("${ours}") doesn't match what's currently on your Google Business Profile ("${google}"). Inconsistent business info hurts local SEO — update whichever one is outdated.`,
+  });
+}
+
 /**
  * Exponential backoff retry utility for network and AI API calls.
  */
@@ -110,8 +133,30 @@ export const autoFetchBusinessPipeline = createServerFn({ method: "POST" })
           updatePayload.photo_url = fetchedDetails.photo_url || fetchedDetails.logo_url;
         }
         if (fetchedDetails.website) updatePayload.website = fetchedDetails.website;
-        if (fetchedDetails.phone) updatePayload.phone = fetchedDetails.phone;
-        if (fetchedDetails.address) updatePayload.address = fetchedDetails.address;
+
+        // NAP Consistency Checker: phone and address are the core "Name/
+        // Address/Phone" identity fields for local SEO. If the business
+        // already has one of these set and Google's live listing now
+        // disagrees, don't silently overwrite it (that could clobber a
+        // deliberate correction the owner made, or mask a real listing
+        // drift) — raise a real, specific alert instead and leave the
+        // existing value untouched until the owner decides.
+        const normalizePhone = (p: string) => p.replace(/\D/g, "").slice(-10);
+        if (fetchedDetails.phone) {
+          if (!currentBiz.phone) {
+            updatePayload.phone = fetchedDetails.phone;
+          } else if (normalizePhone(currentBiz.phone) !== normalizePhone(fetchedDetails.phone)) {
+            await raiseNapAlert(supabaseAdmin, currentBiz.id, "phone number", currentBiz.phone, fetchedDetails.phone);
+          }
+        }
+        if (fetchedDetails.address) {
+          if (!currentBiz.address) {
+            updatePayload.address = fetchedDetails.address;
+          } else if (currentBiz.address.trim().toLowerCase() !== fetchedDetails.address.trim().toLowerCase()) {
+            await raiseNapAlert(supabaseAdmin, currentBiz.id, "address", currentBiz.address, fetchedDetails.address);
+          }
+        }
+
         if (fetchedDetails.description) updatePayload.description = fetchedDetails.description;
         if (fetchedDetails.business_type) updatePayload.business_type = fetchedDetails.business_type;
         if (fetchedDetails.latitude != null) updatePayload.latitude = fetchedDetails.latitude;

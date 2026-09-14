@@ -333,6 +333,27 @@ export type Database = {
           },
         ]
       }
+      onboarding_events: {
+        Row: {
+          id: string
+          user_id: string
+          step: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          step: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          step?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
       faqs: {
         Row: {
           answer: string

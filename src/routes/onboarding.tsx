@@ -44,6 +44,16 @@ function Onboarding() {
   const [busy, setBusy] = useState(false);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
 
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.auth.getUser();
+      if (data.user) {
+        void supabase.from("onboarding_events").insert({ user_id: data.user.id, step } as any);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
+
   // Search state
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<PlaceDetails | null>(null);

@@ -64,6 +64,24 @@ function AdminCRM() {
   // Selected user for FULL INTERACTIVE DASHBOARD INSPECTION
   const [inspectUser, setInspectUser] = useState<any | null>(null);
 
+  const { data: funnelData } = useQuery({
+    queryKey: ["admin-onboarding-funnel"],
+    enabled: tab === "overview",
+    queryFn: async () => {
+      const { data: events } = await supabase.from("onboarding_events").select("user_id, step");
+      const maxStepByUser = new Map<string, number>();
+      for (const e of events ?? []) {
+        maxStepByUser.set(e.user_id, Math.max(maxStepByUser.get(e.user_id) ?? 0, e.step));
+      }
+      const stepCounts: Record<number, number> = {};
+      for (const maxStep of maxStepByUser.values()) {
+        for (let s = 1; s <= maxStep; s++) stepCounts[s] = (stepCounts[s] ?? 0) + 1;
+      }
+      const { count: completedCount } = await supabase.from("businesses").select("id", { count: "exact", head: true });
+      return { stepCounts, totalStarted: maxStepByUser.size, completed: completedCount ?? 0 };
+    },
+  });
+
   // Platform Stats Query
   const { data: stats } = useQuery({
     queryKey: ["admin-stats"],
@@ -438,6 +456,40 @@ function AdminCRM() {
         {/* OVERVIEW */}
         {tab === "overview" && (
           <div className="p-4 space-y-6">
+            <div>
+              <h3 className="font-display font-bold text-base mb-2 text-[var(--ink)]">Onboarding Drop-off Funnel</h3>
+              <div className="bg-white border border-black/10 rounded-2xl p-4 space-y-2">
+                {[1, 2, 3, 4].map((s) => {
+                  const count = funnelData?.stepCounts?.[s] ?? 0;
+                  const started = funnelData?.totalStarted ?? 1;
+                  const pct = started ? Math.round((count / started) * 100) : 0;
+                  return (
+                    <div key={s} className="flex items-center gap-3">
+                      <span className="text-xs font-bold text-zinc-500 w-16 shrink-0">Step {s}</span>
+                      <div className="flex-1 h-6 rounded-full bg-zinc-100 overflow-hidden">
+                        <div className="h-full bg-gradient-to-r from-[var(--brass)] to-[var(--brass-deep)] flex items-center justify-end px-2" style={{ width: `${pct}%` }}>
+                          {pct > 15 && <span className="text-[10px] font-bold text-white">{count}</span>}
+                        </div>
+                      </div>
+                      <span className="text-xs font-mono text-zinc-400 w-10 text-right shrink-0">{pct}%</span>
+                    </div>
+                  );
+                })}
+                <div className="flex items-center gap-3 pt-2 border-t border-black/5">
+                  <span className="text-xs font-bold text-emerald-700 w-16 shrink-0">Completed</span>
+                  <div className="flex-1 h-6 rounded-full bg-zinc-100 overflow-hidden">
+                    <div
+                      className="h-full bg-emerald-500 flex items-center justify-end px-2"
+                      style={{ width: `${funnelData?.totalStarted ? Math.round(((funnelData.completed) / funnelData.totalStarted) * 100) : 0}%` }}
+                    >
+                      <span className="text-[10px] font-bold text-white">{funnelData?.completed ?? 0}</span>
+                    </div>
+                  </div>
+                  <span className="text-xs font-mono text-zinc-400 w-10 text-right shrink-0" />
+                </div>
+                <p className="text-[11px] text-zinc-400 pt-1">{funnelData?.totalStarted ?? 0} people started onboarding. "Completed" counts businesses created platform-wide.</p>
+              </div>
+            </div>
             <div>
               <h3 className="font-display font-bold text-base mb-2 text-[var(--ink)]">Recent Registered Shops</h3>
               <BizTable rows={businesses ?? []} />
